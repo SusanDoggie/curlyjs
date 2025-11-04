@@ -18,15 +18,15 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 ## Installation
 
 ```bash
-npm install myers.js
+npm install curlyjs
 # or
-yarn add myers.js
+yarn add curlyjs
 ```
 
 ## Quick Start
 
 ```typescript
-import { Template } from 'myers.js';
+import { Template } from 'curlyjs';
 
 // Create a template
 const template = new Template('Hello, {{ name }}!');
@@ -323,7 +323,7 @@ const result = t.render({ greeting: 'Hello', name: 'World' });
 ## Complete Example
 
 ```typescript
-import { Template } from 'myers.js';
+import { Template } from 'curlyjs';
 
 // Define custom methods
 const methods = {
@@ -481,4 +481,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Repository
 
-[https://github.com/SusanDoggie/curlyjs](https://github.com/SusanDoggie/myers.js)
+[https://github.com/SusanDoggie/curlyjs](https://github.com/SusanDoggie/curlyjs)
