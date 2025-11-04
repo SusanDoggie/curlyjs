@@ -25,3 +25,4 @@
 
 export * from './template';
 export * from './ast';
+export * from './types';
