@@ -1,6 +1,6 @@
-# TinyTemplate
+# curlyjs
 
-A lightweight, fast, and feature-rich JavaScript template engine with a familiar Jinja2-like syntax. TinyTemplate is designed for developers who need powerful templating capabilities without the overhead of larger frameworks.
+A lightweight, fast, and feature-rich JavaScript template engine with a familiar Jinja2-like syntax. curlyjs is designed for developers who need powerful templating capabilities without the overhead of larger frameworks.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
@@ -256,7 +256,7 @@ console.log(t.veriables);
 
 ### Nested Structures
 
-TinyTemplate handles complex nested structures seamlessly:
+curlyjs handles complex nested structures seamlessly:
 
 ```typescript
 const t = new Template(`
@@ -378,7 +378,7 @@ console.log(html);
 
 ## AST Structure
 
-TinyTemplate parses templates into an Abstract Syntax Tree (AST) for efficient rendering. The AST consists of the following node types:
+curlyjs parses templates into an Abstract Syntax Tree (AST) for efficient rendering. The AST consists of the following node types:
 
 ### Node Types
 
@@ -425,7 +425,7 @@ interface IfBranch {
 
 ## Error Handling
 
-TinyTemplate throws descriptive errors for common issues:
+curlyjs throws descriptive errors for common issues:
 
 ```typescript
 // Unclosed tag
@@ -481,4 +481,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Repository
 
-[https://github.com/SusanDoggie/TinyTemplate](https://github.com/SusanDoggie/myers.js)
+[https://github.com/SusanDoggie/curlyjs](https://github.com/SusanDoggie/myers.js)
