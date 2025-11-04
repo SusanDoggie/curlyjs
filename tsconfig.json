@@ -10,8 +10,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "jsx": "react",
-    "declaration": true,
-    "declarationDir": "types",
     "outDir": "dist",
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
