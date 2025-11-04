@@ -1,10 +1,10 @@
 {
-  "name": "myers.js",
+  "name": "curlyjs",
   "version": "1.0.0",
   "main": "dist/index",
   "module": "dist/index",
   "types": "dist/index.d.ts",
-  "repository": "https://github.com/SusanDoggie/myers.js.git",
+  "repository": "https://github.com/SusanDoggie/curlyjs.git",
   "author": "Susan Cheng <susan.doggie@gmail.com>",
   "license": "MIT",
   "scripts": {
