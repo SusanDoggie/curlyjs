@@ -24,42 +24,7 @@
 //
 
 import _ from 'lodash';
-
-// AST Node types
-interface BaseNode {
-  type: string;
-}
-
-interface TextNode extends BaseNode {
-  type: 'text';
-  text: string;
-}
-
-interface InterpolationNode extends BaseNode {
-  type: 'interpolation';
-  expression: string;
-}
-
-interface ForLoopNode extends BaseNode {
-  type: 'for';
-  itemVar: string;
-  indexVar: string | null;
-  arrayVar: string;
-  body: ASTNode[];
-}
-
-interface IfBranch {
-  condition: string;
-  body: ASTNode[];
-}
-
-interface IfNode extends BaseNode {
-  type: 'if';
-  branches: IfBranch[];
-  elseBody: ASTNode[] | null;
-}
-
-type ASTNode = TextNode | InterpolationNode | ForLoopNode | IfNode;
+import type { ASTNode, TextNode, InterpolationNode, ForLoopNode, IfNode, IfBranch } from './ast';
 
 interface TemplateData {
   [key: string]: any;

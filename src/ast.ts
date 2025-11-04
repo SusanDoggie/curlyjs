@@ -1,5 +1,5 @@
 //
-//  index.ts
+//  ast.ts
 //
 //  The MIT License
 //  Copyright (c) 2015 - 2025 Susan Cheng. All rights reserved.
@@ -23,5 +23,38 @@
 //  THE SOFTWARE.
 //
 
-export * from './template';
-export * from './ast';
+// AST Node types
+export interface BaseNode {
+  type: string;
+}
+
+export interface TextNode extends BaseNode {
+  type: 'text';
+  text: string;
+}
+
+export interface InterpolationNode extends BaseNode {
+  type: 'interpolation';
+  expression: string;
+}
+
+export interface ForLoopNode extends BaseNode {
+  type: 'for';
+  itemVar: string;
+  indexVar: string | null;
+  arrayVar: string;
+  body: ASTNode[];
+}
+
+export interface IfBranch {
+  condition: string;
+  body: ASTNode[];
+}
+
+export interface IfNode extends BaseNode {
+  type: 'if';
+  branches: IfBranch[];
+  elseBody: ASTNode[] | null;
+}
+
+export type ASTNode = TextNode | InterpolationNode | ForLoopNode | IfNode;
