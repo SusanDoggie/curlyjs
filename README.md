@@ -10,9 +10,9 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 - 🎯 **Simple Syntax** - Clean, readable Jinja2-inspired template syntax
 - 🔄 **Control Flow** - Full support for conditionals (`if/elif/else`) and loops (`for`)
 - 📊 **Operators** - Comparison, logical, and arithmetic operators
-- 🔧 **Custom Methods** - Extend templates with custom functions
+- 🔧 **Custom Methods** - Extend templates with custom functions and method calls in loops
 - 🌳 **Nested Structures** - Support for deeply nested objects and arrays
-- 📝 **Variable Extraction** - Automatically detect variables used in templates
+- 📝 **Variable & Method Extraction** - Automatically detect variables and methods used in templates
 - ⚡ **AST-based** - Efficient parsing and rendering via Abstract Syntax Tree
 
 ## Installation
@@ -131,6 +131,39 @@ const t = new Template(`
   {% endfor %}
 `);
 t.render({ grid: [[1, 2], [3, 4]] }); // "1234"
+```
+
+#### For Loops with Method Calls
+
+For loops can use method calls to generate arrays dynamically:
+
+```typescript
+const t = new Template('{% for item in getItems() %}{{ item }}, {% endfor %}');
+const methods = {
+  getItems: () => ['x', 'y', 'z']
+};
+t.render({}, methods); // "x, y, z, "
+```
+
+Method calls can accept arguments and be nested:
+
+```typescript
+const t = new Template('{% for item in filter(items, condition) %}{{ item }} {% endfor %}');
+const methods = {
+  filter: (arr, predicate) => arr.filter(x => x > predicate)
+};
+t.render({ items: [1, 2, 3, 4, 5], condition: 2 }, methods); // "3 4 5 "
+```
+
+Complex method expressions are supported:
+
+```typescript
+const t = new Template('{% for item in reverse(sort(items)) %}{{ item }} {% endfor %}');
+const methods = {
+  sort: (arr) => [...arr].sort(),
+  reverse: (arr) => [...arr].reverse()
+};
+t.render({ items: ['c', 'a', 'b'] }, methods); // "c b a "
 ```
 
 ### Operators
@@ -254,6 +287,40 @@ console.log(t.variables);
 
 **Note:** Loop variables (like `item` in a `for` loop) are excluded from extraction.
 
+### Method Extraction
+
+Extract all method calls used in a template:
+
+```typescript
+const t = new Template(`
+  {{ upper(user.name) }}
+  {% if isValid(data) %}
+    {% for item in filter(items, condition) %}
+      {{ format(item) }}
+    {% endfor %}
+  {% endif %}
+`);
+
+console.log(t.methods);
+// ["upper", "isValid", "filter", "format"]
+```
+
+This is useful for:
+- Validating that all required methods are provided
+- Understanding template dependencies
+- Documentation and analysis
+
+### Combined Variable and Method Extraction
+
+Variables and methods are extracted separately:
+
+```typescript
+const t = new Template('{{ upper(user.name) }} {% for item in getItems(data) %}{{ format(item) }}{% endfor %}');
+
+console.log(t.variables); // ["user", "data"]
+console.log(t.methods);   // ["upper", "getItems", "format"]
+```
+
 ### Nested Structures
 
 curlyjs handles complex nested structures seamlessly:
@@ -301,6 +368,7 @@ Creates a new Template instance from a template string.
 
 - `template: string` - The original template string (read-only)
 - `variables: string[]` - Array of variable names used in the template (read-only)
+- `methods: string[]` - Array of method names used in the template (read-only)
 
 #### Methods
 
@@ -374,6 +442,13 @@ const data = {
 
 const html = template.render(data, methods);
 console.log(html);
+
+// Extract template dependencies
+console.log('Variables:', template.variables);
+// ["user"]
+
+console.log('Methods:', template.methods);
+// ["upper", "formatPrice", "isEmpty"]
 ```
 
 ## AST Structure
@@ -459,10 +534,12 @@ try {
    const result2 = template.render({ name: 'Bob' });
    ```
 
-2. **Use variable extraction**: Validate data before rendering
+2. **Use variable and method extraction**: Validate data and methods before rendering
    ```typescript
    const requiredVars = template.variables;
+   const requiredMethods = template.methods;
    const hasAllVars = requiredVars.every(v => v in data);
+   const hasAllMethods = requiredMethods.every(m => m in methods);
    ```
 
 3. **Pre-define methods**: Avoid creating method objects in hot paths
