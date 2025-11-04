@@ -118,7 +118,7 @@ Array is empty
       {% endif %}
     `);
 
-    const vars = template.veriables.sort();
+    const vars = template.variables.sort();
     expect(vars).toEqual(['array', 'number', 'status', 'user'].sort());
   });
 });

@@ -29,44 +29,44 @@ import { Template } from '../src/template';
 describe('Variable Extraction', () => {
   test('extracts simple variable', () => {
     const t = new Template('{{ name }}');
-    expect(t.veriables).toEqual(['name']);
+    expect(t.variables).toEqual(['name']);
   });
 
   test('extracts nested property', () => {
     const t = new Template('{{ user.name }}');
-    expect(t.veriables).toEqual(['user']);
+    expect(t.variables).toEqual(['user']);
   });
 
   test('extracts multiple variables', () => {
     const t = new Template('{{ firstName }} {{ lastName }}');
-    const vars = t.veriables.sort();
+    const vars = t.variables.sort();
     expect(vars).toEqual(['firstName', 'lastName']);
   });
 
   test('extracts variables from method arguments', () => {
     const t = new Template('{{ upper(name) }}');
-    expect(t.veriables).toEqual(['name']);
+    expect(t.variables).toEqual(['name']);
   });
 
   test('does not extract method names as variables', () => {
     const t = new Template('{{ upper("text") }}');
-    expect(t.veriables).toEqual([]);
+    expect(t.variables).toEqual([]);
   });
 
   test('extracts from for loop', () => {
     const t = new Template('{% for item in items  %}{{ item }}{% endfor %}');
-    expect(t.veriables).toEqual(['items']);
+    expect(t.variables).toEqual(['items']);
   });
 
   test('does not extract loop variables', () => {
     const t = new Template('{% for item in items  %}{{ item }}{% endfor %}');
-    const vars = t.veriables;
+    const vars = t.variables;
     expect(vars.includes('item')).toBe(false);
   });
 
   test('extracts from if condition', () => {
     const t = new Template('{% if count > 5  %}yes{% endif %}');
-    expect(t.veriables).toEqual(['count']);
+    expect(t.variables).toEqual(['count']);
   });
 
   test('extracts from nested structures', () => {
@@ -75,7 +75,7 @@ describe('Variable Extraction', () => {
         {% if item.active  %}{{ item.name }}{% endif %}
       {% endfor %}
     `);
-    const vars = t.veriables.sort();
+    const vars = t.variables.sort();
     expect(vars).toEqual(['items']);
   });
 
@@ -86,7 +86,29 @@ describe('Variable Extraction', () => {
         {% for item in items  %}{{ item }}{% endfor %}
       {% endif %}
     `);
-    const vars = t.veriables.sort();
+    const vars = t.variables.sort();
     expect(vars).toEqual(['count', 'items', 'threshold', 'user'].sort());
+  });
+
+  test('extracts top-level variables in nested scopes', () => {
+    const t = new Template(`
+      {% if count > threshold  %}
+        {{ name }}
+      {% endif %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['count', 'name', 'threshold'].sort());
+  });
+
+  test('extracts top-level variables in nested for loops with conditionals', () => {
+    const t = new Template(`
+      {% for item in items  %}
+        {% if condition  %}
+          {{ title }} - {{ item.value }}
+        {% endif %}
+      {% endfor %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['condition', 'items', 'title'].sort());
   });
 });

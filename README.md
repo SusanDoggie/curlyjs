@@ -248,7 +248,7 @@ const t = new Template(`
   {% endif %}
 `);
 
-console.log(t.veriables); 
+console.log(t.variables); 
 // ["user", "count", "threshold", "items"]
 ```
 
@@ -300,7 +300,7 @@ Creates a new Template instance from a template string.
 #### Properties
 
 - `template: string` - The original template string (read-only)
-- `veriables: string[]` - Array of variable names used in the template (read-only)
+- `variables: string[]` - Array of variable names used in the template (read-only)
 
 #### Methods
 
@@ -461,7 +461,7 @@ try {
 
 2. **Use variable extraction**: Validate data before rendering
    ```typescript
-   const requiredVars = template.veriables;
+   const requiredVars = template.variables;
    const hasAllVars = requiredVars.every(v => v in data);
    ```
 

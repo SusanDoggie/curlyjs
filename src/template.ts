@@ -319,7 +319,7 @@ export class Template {
     throw new Error('No matching endif for if block');
   }
 
-  get veriables(): string[] {
+  get variables(): string[] {
     const variables = new Set<string>();
     const loopVars = new Set<string>(); // Track loop variables to exclude them
     this.#extractVariables(this.#ast, variables, loopVars);
