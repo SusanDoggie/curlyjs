@@ -1,5 +1,5 @@
 //
-//  template.ts
+//  types.ts
 //
 //  The MIT License
 //  Copyright (c) 2015 - 2025 Susan Cheng. All rights reserved.
@@ -23,39 +23,10 @@
 //  THE SOFTWARE.
 //
 
-import type { ASTNode } from './ast';
-import type { TemplateData, TemplateMethods } from './types';
-import { parseTemplate } from './parser';
-import { extractVariables, extractMethods } from './analyzer';
-import { renderNodes } from './renderer';
+export interface TemplateData {
+  [key: string]: any;
+}
 
-export class Template {
-  #template: string;
-  #ast: ASTNode[];
-
-  constructor(template: string) {
-    this.#template = template;
-    this.#ast = parseTemplate(template);
-  }
-
-  get template(): string {
-    return this.#template;
-  }
-
-  get variables(): string[] {
-    const variables = new Set<string>();
-    const loopVars = new Set<string>(); // Track loop variables to exclude them
-    extractVariables(this.#ast, variables, loopVars);
-    return Array.from(variables);
-  }
-
-  get methods(): string[] {
-    const methods = new Set<string>();
-    extractMethods(this.#ast, methods);
-    return Array.from(methods);
-  }
-
-  render(data: TemplateData, methods: TemplateMethods = {}): string {
-    return renderNodes(this.#ast, data, methods);
-  }
+export interface TemplateMethods {
+  [key: string]: (...args: any[]) => any;
 }
