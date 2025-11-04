@@ -129,6 +129,133 @@ describe('Variable Extraction', () => {
     const vars = t.variables.sort();
     expect(vars).toEqual(['items'].sort());
   });
+
+  test('handles deeply nested scopes with mixed loop variables', () => {
+    const t = new Template(`
+      {% for category in categories  %}
+        {% for product in category.products  %}
+          {% for review in product.reviews  %}
+            {% if review.rating > threshold  %}
+              {{ format(review.comment, user.name) }}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      {% endfor %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['categories', 'threshold', 'user'].sort());
+  });
+
+  test('excludes all nested loop variables from extraction', () => {
+    const t = new Template(`
+      {% for outer in outerList  %}
+        {% for middle in outer.items  %}
+          {% for inner in middle.data  %}
+            {{ outer.id }}-{{ middle.name }}-{{ inner.value }}
+          {% endfor %}
+        {% endfor %}
+      {% endfor %}
+    `);
+    const vars = t.variables;
+    expect(vars).toEqual(['outerList']);
+    expect(vars.includes('outer')).toBe(false);
+    expect(vars.includes('middle')).toBe(false);
+    expect(vars.includes('inner')).toBe(false);
+  });
+
+  test('handles complex nested conditions with variables', () => {
+    const t = new Template(`
+      {% if userRole == "admin"  %}
+        {% for user in users  %}
+          {% if user.active && user.department == targetDept  %}
+            {% for permission in user.permissions  %}
+              {% if hasAccess(permission, resource)  %}
+                {{ user.name }} can access {{ resource.name }}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['resource', 'targetDept', 'userRole', 'users'].sort());
+  });
+
+  test('handles method calls with variables in nested scopes', () => {
+    const t = new Template(`
+      {% for item in filter(items, criteria)  %}
+        {% if validate(item, rules)  %}
+          {% for detail in item.details  %}
+            {{ transform(detail, config.format) }}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['config', 'criteria', 'items', 'rules'].sort());
+  });
+
+  test('handles mixed loop and conditional scopes with method calls', () => {
+    const t = new Template(`
+      {% if isEnabled(feature)  %}
+        {% for batch in getBatches(data, batchSize)  %}
+          {% for item in batch  %}
+            {% if process(item, settings)  %}
+              {{ format(item.result, template) }}
+            {% else %}
+              {{ logError(item.error, logger) }}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      {% endif %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['batchSize', 'data', 'feature', 'logger', 'settings', 'template'].sort());
+  });
+
+  test('handles variable shadowing in nested scopes', () => {
+    const t = new Template(`
+      {% for item in items  %}
+        {{ item.name }}
+        {% for item in item.children  %}
+          {{ item.title }}
+          {% for item in item.subItems  %}
+            {{ item.description }}
+          {% endfor %}
+        {% endfor %}
+      {% endfor %}
+    `);
+    const vars = t.variables;
+    expect(vars).toEqual(['items']);
+  });
+
+  test('handles index variables in nested loops', () => {
+    const t = new Template(`
+      {% for row, i in rows  %}
+        {% for col, j in row  %}
+          Cell[{{ i }}][{{ j }}]: {{ getValue(col, coordinates) }}
+        {% endfor %}
+      {% endfor %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['coordinates', 'rows'].sort());
+  });
+
+  test('handles complex expressions in nested scopes', () => {
+    const t = new Template(`
+      {% for group in groupBy(items, category)  %}
+        {% if group.length > minSize  %}
+          {% for item in sortBy(group, field)  %}
+            {% if item.score > average(scores)  %}
+              {{ highlight(item.name, color) }}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+    `);
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['category', 'color', 'field', 'items', 'minSize', 'scores'].sort());
+  });
 });
 
 describe('Method Extraction', () => {
@@ -226,5 +353,87 @@ describe('Method Extraction', () => {
     const t = new Template('{% for item in reverse(sort(items))  %}{{ item }}{% endfor %}');
     const methods = t.methods.sort();
     expect(methods).toEqual(['reverse', 'sort']);
+  });
+
+  test('extracts methods from deeply nested scopes', () => {
+    const t = new Template(`
+      {% for category in getCategories()  %}
+        {% for product in category.products  %}
+          {% for review in filterReviews(product.reviews, criteria)  %}
+            {% if validate(review.rating)  %}
+              {{ format(review.comment, transform(user.name)) }}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      {% endfor %}
+    `);
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['filterReviews', 'format', 'getCategories', 'transform', 'validate']);
+  });
+
+  test('extracts methods from complex nested conditions', () => {
+    const t = new Template(`
+      {% if checkPermission(user, "admin")  %}
+        {% for user in getUsers()  %}
+          {% if isActive(user) && belongsTo(user, department)  %}
+            {% for permission in user.permissions  %}
+              {% if hasAccess(permission, resource)  %}
+                {{ formatUser(user.name) }} can access {{ formatResource(resource.name) }}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    `);
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['belongsTo', 'checkPermission', 'formatResource', 'formatUser', 'getUsers', 'hasAccess', 'isActive']);
+  });
+
+  test('extracts methods from mixed nested scopes with method chaining', () => {
+    const t = new Template(`
+      {% if isEnabled(getFeature(config))  %}
+        {% for batch in splitIntoBatches(getData(), getBatchSize())  %}
+          {% for item in batch  %}
+            {% if shouldProcess(item, getSettings())  %}
+              {{ formatResult(item.result, getTemplate()) }}
+            {% else %}
+              {{ logError(item.error, getLogger()) }}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      {% endif %}
+    `);
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['formatResult', 'getBatchSize', 'getData', 'getFeature', 'getLogger', 'getSettings', 'getTemplate', 'isEnabled', 'logError', 'shouldProcess', 'splitIntoBatches']);
+  });
+
+  test('extracts methods from complex expressions in nested loops', () => {
+    const t = new Template(`
+      {% for group in groupBy(sortBy(items, getField()), getCategory())  %}
+        {% if isValidGroup(group, getMinSize())  %}
+          {% for item in orderBy(group, getSortOrder())  %}
+            {% if compare(item.score, calculateAverage(scores))  %}
+              {{ highlight(item.name, getColor()) }}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+    `);
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['calculateAverage', 'compare', 'getCategory', 'getColor', 'getField', 'getMinSize', 'getSortOrder', 'groupBy', 'highlight', 'isValidGroup', 'orderBy', 'sortBy']);
+  });
+
+  test('handles method extraction with variable arguments in nested scopes', () => {
+    const t = new Template(`
+      {% for processor in getProcessors(config.type)  %}
+        {% for item in processor.items  %}
+          {% if canProcess(item, processor.settings, globalFlags)  %}
+            {{ execute(processor.name, item, getOptions(item.type)) }}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+    `);
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['canProcess', 'execute', 'getOptions', 'getProcessors']);
   });
 });
