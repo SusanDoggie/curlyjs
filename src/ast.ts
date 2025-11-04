@@ -42,7 +42,7 @@ export interface ForLoopNode extends BaseNode {
   type: 'for';
   itemVar: string;
   indexVar: string | null;
-  arrayVar: string;
+  arrayExpr: string;
   body: ASTNode[];
 }
 

@@ -82,4 +82,80 @@ describe('For Loops', () => {
     const data = { matrix: [[1, 2, 3], [4, 5, 6]] };
     expect(t.render(data)).toBe('[123][456]');
   });
+
+  test('renders for loop with method call returning array', () => {
+    const t = new Template('{% for item in getItems()  %}{{ item }},{% endfor %}');
+    const methods = {
+      getItems: () => ['x', 'y', 'z']
+    };
+    expect(t.render({}, methods)).toBe('x,y,z,');
+  });
+
+  test('renders for loop with method call with arguments', () => {
+    const t = new Template('{% for item in slice(items, 1)  %}{{ item }},{% endfor %}');
+    const methods = {
+      slice: (arr: any[], start: number) => arr.slice(start)
+    };
+    const data = { items: ['a', 'b', 'c', 'd'] };
+    expect(t.render(data, methods)).toBe('b,c,d,');
+  });
+
+  test('renders for loop with nested method call', () => {
+    const t = new Template('{% for item in reverse(sort(items))  %}{{ item }},{% endfor %}');
+    const methods = {
+      sort: (arr: any[]) => [...arr].sort(),
+      reverse: (arr: any[]) => [...arr].reverse()
+    };
+    const data = { items: ['c', 'a', 'b'] };
+    expect(t.render(data, methods)).toBe('c,b,a,');
+  });
+
+  test('renders for loop with method call using variable', () => {
+    const t = new Template('{% for item in filter(items, condition)  %}{{ item }},{% endfor %}');
+    const methods = {
+      filter: (arr: any[], predicate: string) => {
+        if (predicate === 'even') {
+          return arr.filter((n: number) => n % 2 === 0);
+        }
+        return arr;
+      }
+    };
+    const data = { items: [1, 2, 3, 4, 5], condition: 'even' };
+    expect(t.render(data, methods)).toBe('2,4,');
+  });
+
+  test('renders for loop with complex expression', () => {
+    const t = new Template('{% for item in concat(items1, items2)  %}{{ item }},{% endfor %}');
+    const methods = {
+      concat: (arr1: any[], arr2: any[]) => [...arr1, ...arr2]
+    };
+    const data = { items1: ['a', 'b'], items2: ['c', 'd'] };
+    expect(t.render(data, methods)).toBe('a,b,c,d,');
+  });
+
+  test('renders for loop with arithmetic in method arguments', () => {
+    const t = new Template('{% for item in slice(items, start + 1, end - 1)  %}{{ item }},{% endfor %}');
+    const methods = {
+      slice: (arr: any[], start: number, end: number) => arr.slice(start, end)
+    };
+    const data = { items: ['a', 'b', 'c', 'd', 'e'], start: 0, end: 4 };
+    expect(t.render(data, methods)).toBe('b,c,');
+  });
+
+  test('renders for loop with property access in method arguments', () => {
+    const t = new Template('{% for item in filter(data.items, config.filter)  %}{{ item }},{% endfor %}');
+    const methods = {
+      filter: (arr: any[], filterType: string) => {
+        if (filterType === 'odd') {
+          return arr.filter((n: number) => n % 2 === 1);
+        }
+        return arr;
+      }
+    };
+    const data = {
+      data: { items: [1, 2, 3, 4, 5] },
+      config: { filter: 'odd' }
+    };
+    expect(t.render(data, methods)).toBe('1,3,5,');
+  });
 });

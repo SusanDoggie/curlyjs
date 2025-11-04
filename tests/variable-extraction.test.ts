@@ -111,4 +111,120 @@ describe('Variable Extraction', () => {
     const vars = t.variables.sort();
     expect(vars).toEqual(['condition', 'items', 'title'].sort());
   });
+
+  test('extracts variables from method calls in for loops', () => {
+    const t = new Template('{% for item in getItems(data)  %}{{ item }}{% endfor %}');
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['data'].sort());
+  });
+
+  test('extracts variables from complex expressions in for loops', () => {
+    const t = new Template('{% for item in filter(items, condition)  %}{{ item }}{% endfor %}');
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['condition', 'items'].sort());
+  });
+
+  test('extracts variables from nested method calls in for loops', () => {
+    const t = new Template('{% for item in reverse(sort(items))  %}{{ item }}{% endfor %}');
+    const vars = t.variables.sort();
+    expect(vars).toEqual(['items'].sort());
+  });
+});
+
+describe('Method Extraction', () => {
+  test('extracts simple method call', () => {
+    const t = new Template('{{ upper(name) }}');
+    expect(t.methods).toEqual(['upper']);
+  });
+
+  test('extracts multiple method calls', () => {
+    const t = new Template('{{ upper(firstName) }} {{ lower(lastName) }}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['lower', 'upper']);
+  });
+
+  test('extracts methods with string arguments', () => {
+    const t = new Template('{{ upper("hello") }} {{ join(items, ",") }}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['join', 'upper']);
+  });
+
+  test('extracts nested method calls', () => {
+    const t = new Template('{{ upper(lower(name)) }}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['lower', 'upper']);
+  });
+
+  test('extracts methods from conditional expressions', () => {
+    const t = new Template('{% if isEmpty(items)  %}Empty{% endif %}');
+    expect(t.methods).toEqual(['isEmpty']);
+  });
+
+  test('extracts methods from complex conditionals', () => {
+    const t = new Template('{% if isValid(user) && hasRole(user, "admin")  %}Admin panel{% endif %}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['hasRole', 'isValid']);
+  });
+
+  test('extracts methods from for loops', () => {
+    const t = new Template('{% for item in items  %}{{ format(item) }}{% endfor %}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['format']);
+  });
+
+  test('extracts methods with complex arguments', () => {
+    const t = new Template('{{ format("Hello {0}, you have {1} items", name, count(items)) }}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['count', 'format']);
+  });
+
+  test('does not extract method names from string literals', () => {
+    const t = new Template('{{ message("call upper() function") }}');
+    expect(t.methods).toEqual(['message']);
+  });
+
+  test('extracts methods from nested structures', () => {
+    const t = new Template(`
+      {% if hasPermission(user, "admin")  %}
+        {% for item in items  %}
+          {{ format(item.name) }} - {{ capitalize(item.type) }}
+        {% endfor %}
+      {% endif %}
+    `);
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['capitalize', 'format', 'hasPermission']);
+  });
+
+  test('extracts methods and variables separately', () => {
+    const t = new Template('{{ upper(user.name) }} {% if count > limit  %}{{ format(message) }}{% endif %}');
+
+    const variables = t.variables.sort();
+    expect(variables).toEqual(['count', 'limit', 'message', 'user']);
+
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['format', 'upper']);
+  });
+
+  test('handles methods with whitespace before parentheses', () => {
+    const t = new Template('{{ trim (text) }} {{ normalize  ( value ) }}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['normalize', 'trim']);
+  });
+
+  test('extracts methods from for loop expressions', () => {
+    const t = new Template('{% for item in getItems()  %}{{ item }}{% endfor %}');
+    expect(t.methods).toEqual(['getItems']);
+  });
+
+  test('extracts methods from complex for loop expressions', () => {
+    const t = new Template('{% for item in filter(items, condition)  %}{{ item }}{% endfor %}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['filter']);
+  });
+
+  test('extracts methods from nested method calls in for loops', () => {
+    const t = new Template('{% for item in reverse(sort(items))  %}{{ item }}{% endfor %}');
+    const methods = t.methods.sort();
+    expect(methods).toEqual(['reverse', 'sort']);
+  });
 });

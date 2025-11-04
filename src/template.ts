@@ -51,14 +51,14 @@ function createInterpolationNode(expression: string): InterpolationNode {
 function createForLoopNode(
   itemVar: string,
   indexVar: string | null,
-  arrayVar: string,
+  arrayExpr: string,
   body: ASTNode[]
 ): ForLoopNode {
   return {
     type: 'for',
     itemVar,
     indexVar,
-    arrayVar,
+    arrayExpr,
     body
   };
 }
@@ -130,13 +130,13 @@ export class Template {
 
       // Check what type of tag this is
       if (isStatement && tagContent.startsWith('for ')) {
-        // Parse for loop
-        const forMatch = tagContent.match(/^for\s+(\w+)(?:\s*,\s*(\w+))?\s+in\s+([\w.]+)$/);
+        // Parse for loop - allow complex expressions after 'in'
+        const forMatch = tagContent.match(/^for\s+(\w+)(?:\s*,\s*(\w+))?\s+in\s+(.+)$/);
         if (!forMatch) {
           throw new Error('Invalid for loop syntax: ' + tagContent);
         }
         
-        const [, itemVar, indexVar, arrayVar] = forMatch;
+        const [, itemVar, indexVar, arrayExpr] = forMatch;
         
         // Find the matching endfor
         const endForTag = this.#findMatchingEnd(template, tagEnd + 2, 'for', 'endfor');
@@ -147,7 +147,7 @@ export class Template {
         const loopBody = template.slice(tagEnd + 2, endForTag);
         const bodyNodes = this.#parse(loopBody);
         
-        nodes.push(createForLoopNode(itemVar, indexVar || null, arrayVar, bodyNodes));
+        nodes.push(createForLoopNode(itemVar, indexVar || null, arrayExpr.trim(), bodyNodes));
         
         // Skip past the endfor tag
         pos = template.indexOf('%}', endForTag) + 2;
@@ -326,6 +326,12 @@ export class Template {
     return Array.from(variables);
   }
 
+  get methods(): string[] {
+    const methods = new Set<string>();
+    this.#extractMethods(this.#ast, methods);
+    return Array.from(methods);
+  }
+
   #extractVariables(nodes: ASTNode[], variables: Set<string>, loopVars: Set<string> = new Set()): void {
     for (const node of nodes) {
       switch (node.type) {
@@ -338,10 +344,8 @@ export class Template {
           break;
           
         case 'for':
-          // Add the array variable
-          if (!loopVars.has(node.arrayVar)) {
-            variables.add(node.arrayVar);
-          }
+          // Extract variables from the array expression
+          this.#extractFromExpression(node.arrayExpr, variables, loopVars);
           // Create new loop vars set including the item and index vars
           const newLoopVars = new Set([...loopVars, node.itemVar]);
           if (node.indexVar) newLoopVars.add(node.indexVar);
@@ -384,9 +388,21 @@ export class Template {
       return inString;
     };
 
-    // Check if this is a method call
-    const methodCall = expr.match(/^(\w+)\(/);
-    
+    // First, collect all method names to exclude them from variables
+    const methodNames = new Set<string>();
+    const methodMatches = expr.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g);
+    for (const match of methodMatches) {
+      const methodName = match[1];
+      const position = match.index!;
+
+      // Skip if inside a string literal
+      if (isInString(expr, position)) {
+        continue;
+      }
+
+      methodNames.add(methodName);
+    }
+
     // Find all potential variable references
     const varMatches = expr.matchAll(/\b([a-zA-Z_][\w.]*)\b/g);
     for (const match of varMatches) {
@@ -402,21 +418,89 @@ export class Template {
       if (varName === 'true' || varName === 'false' || !isNaN(Number(varName))) {
         continue;
       }
-      
-      // Skip if this is the method name itself (not an argument)
-      if (methodCall && position === 0 && varName === methodCall[1]) {
-        continue;
-      }
-      
+
       // Get the root variable (before any dots)
       const rootVar = varName.split('.')[0];
       
+      // Skip if this is a method name
+      if (methodNames.has(rootVar)) {
+        continue;
+      }
+
       // Skip loop variables
       if (loopVars.has(rootVar)) {
         continue;
       }
       
       variables.add(rootVar);
+    }
+  }
+
+  #extractMethods(nodes: ASTNode[], methods: Set<string>): void {
+    for (const node of nodes) {
+      switch (node.type) {
+        case 'text':
+          // No methods in text nodes
+          break;
+
+        case 'interpolation':
+          this.#extractMethodsFromExpression(node.expression, methods);
+          break;
+
+        case 'for':
+          // Extract methods from the array expression
+          this.#extractMethodsFromExpression(node.arrayExpr, methods);
+          // Recursively extract from body
+          this.#extractMethods(node.body, methods);
+          break;
+
+        case 'if':
+          // Extract from all branch conditions
+          for (const branch of node.branches) {
+            this.#extractMethodsFromExpression(branch.condition, methods);
+            this.#extractMethods(branch.body, methods);
+          }
+          // Extract from else body if exists
+          if (node.elseBody) {
+            this.#extractMethods(node.elseBody, methods);
+          }
+          break;
+      }
+    }
+  }
+
+  #extractMethodsFromExpression(expr: string, methods: Set<string>): void {
+    // Helper to check if a position is inside a string literal
+    const isInString = (str: string, pos: number): boolean => {
+      let inString = false;
+      let quoteChar = '';
+      for (let i = 0; i < pos; i++) {
+        const char = str[i];
+        if ((char === '"' || char === "'") && (i === 0 || str[i - 1] !== '\\')) {
+          if (!inString) {
+            inString = true;
+            quoteChar = char;
+          } else if (char === quoteChar) {
+            inString = false;
+            quoteChar = '';
+          }
+        }
+      }
+      return inString;
+    };
+
+    // Find all method calls: methodName(
+    const methodMatches = expr.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g);
+    for (const match of methodMatches) {
+      const methodName = match[1];
+      const position = match.index!;
+
+      // Skip if inside a string literal
+      if (isInString(expr, position)) {
+        continue;
+      }
+
+      methods.add(methodName);
     }
   }
 
@@ -471,7 +555,7 @@ export class Template {
         return value !== null && value !== undefined ? String(value) : '';
         
       case 'for':
-        const array = _.get(data, node.arrayVar);
+        const array = this.#evalExpr(node.arrayExpr, data, methods);
         if (!Array.isArray(array)) return '';
         
         return array.map((item, idx) => {
