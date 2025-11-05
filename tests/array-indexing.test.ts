@@ -129,4 +129,41 @@ describe('Array Indexing', () => {
       expect(t.render(data, testMethods)).toBe('a, b, c');
     });
   });
+
+  describe('Nested array indexing', () => {
+    test('uses array element as index', () => {
+      const t = new Template('{{ array[indices[0]] }}');
+      const data = {
+        array: ['a', 'b', 'c', 'd', 'e'],
+        indices: [2, 3, 4]
+      };
+      expect(t.render(data, testMethods)).toBe('c');
+    });
+
+    test('uses complex nested indexing', () => {
+      const t = new Template('{{ matrix[indices[0]][indices[1]] }}');
+      const data = {
+        matrix: [
+          [1, 2, 3],
+          [4, 5, 6],
+          [7, 8, 9]
+        ],
+        indices: [1, 2]
+      };
+      expect(t.render(data, testMethods)).toBe('6');
+    });
+
+    test('combines variable and literal indices', () => {
+      const t = new Template('{{ data[row][2] }}');
+      const data = {
+        data: [
+          ['a', 'b', 'c'],
+          ['d', 'e', 'f'],
+          ['g', 'h', 'i']
+        ],
+        row: 1
+      };
+      expect(t.render(data, testMethods)).toBe('f');
+    });
+  });
 });
