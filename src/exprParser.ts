@@ -52,8 +52,6 @@ const OPERATORS: Record<string, { precedence: number; associativity: 'left' | 'r
   '**': { precedence: 11, associativity: 'right' }, // Exponentiation is right-associative
 };
 
-const UNARY_OPERATORS = ['!', '~'];
-
 type Token =
   | { type: 'number'; value: number }
   | { type: 'string'; value: string }
