@@ -24,6 +24,7 @@
 //
 
 import { describe, test, expect } from '@jest/globals';
+import Decimal from 'decimal.js';
 import { Template } from '../src/template';
 
 describe('Template JSON serialization', () => {
@@ -442,6 +443,141 @@ describe('Template JSON serialization', () => {
       const restored = Template.fromJSON(json);
 
       expect(restored.render({})).toBe(original.render({}));
+    });
+
+    test('should reconstruct a template with Decimal arithmetic', () => {
+      const original = new Template('{{ a + b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        a: new Decimal('0.1'),
+        b: new Decimal('0.2'),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('0.3');
+    });
+
+    test('should reconstruct a template with Decimal comparison', () => {
+      const original = new Template('{% if price > threshold %}expensive{% else %}affordable{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data1 = {
+        price: new Decimal('99.99'),
+        threshold: new Decimal('100.00'),
+      };
+      const data2 = {
+        price: new Decimal('100.01'),
+        threshold: new Decimal('100.00'),
+      };
+
+      expect(restored.render(data1)).toBe(original.render(data1));
+      expect(restored.render(data2)).toBe(original.render(data2));
+    });
+
+    test('should reconstruct a template with Decimal multiplication', () => {
+      const original = new Template('Total: ${{ price * quantity }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        price: new Decimal('19.99'),
+        quantity: new Decimal('3'),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('Total: $59.97');
+    });
+
+    test('should reconstruct a template with BigInt arithmetic', () => {
+      const original = new Template('{{ a + b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        a: BigInt(100),
+        b: BigInt(200),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('300');
+    });
+
+    test('should reconstruct a template with BigInt comparison', () => {
+      const original = new Template('{% if count > limit %}over{% else %}under{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data1 = {
+        count: BigInt(1000),
+        limit: BigInt(500),
+      };
+      const data2 = {
+        count: BigInt(100),
+        limit: BigInt(500),
+      };
+
+      expect(restored.render(data1)).toBe(original.render(data1));
+      expect(restored.render(data2)).toBe(original.render(data2));
+    });
+
+    test('should reconstruct a template with BigInt exponentiation', () => {
+      const original = new Template('2^10 = {{ base ** exp }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        base: BigInt(2),
+        exp: BigInt(10),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('2^10 = 1024');
+    });
+
+    test('should reconstruct a template with Decimal in loops', () => {
+      const original = new Template('{% for price in prices %}${{ price }},{% endfor %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        prices: [
+          new Decimal('19.99'),
+          new Decimal('29.99'),
+          new Decimal('39.99'),
+        ],
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should reconstruct a template with mixed Decimal and string operations', () => {
+      const original = new Template('Price: ${{ price }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        price: new Decimal('99.99'),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('Price: $99.99');
+    });
+
+    test('should reconstruct a template with Decimal equality check', () => {
+      const original = new Template('{% if a == b %}equal{% else %}not equal{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data1 = {
+        a: new Decimal('0.3'),
+        b: new Decimal('0.3'),
+      };
+      const data2 = {
+        a: new Decimal('0.1'),
+        b: new Decimal('0.2'),
+      };
+
+      expect(restored.render(data1)).toBe(original.render(data1));
+      expect(restored.render(data1)).toBe('equal');
+      expect(restored.render(data2)).toBe(original.render(data2));
+      expect(restored.render(data2)).toBe('not equal');
     });
   });
 

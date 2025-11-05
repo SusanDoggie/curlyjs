@@ -42,13 +42,19 @@ yarn clean               # Remove dist/
 - **Test helpers**: Import `testMethods` from `tests/helpers.ts` for common template methods (upper, lower, join, etc.)
 - **Test structure**: Use `describe` blocks organized by feature, test edge cases explicitly
 - **Assertion style**: Direct Jest `expect()` assertions, test both success and error cases
+- **CRITICAL: JSON Serialization Testing**: When adding new features (operators, value types, syntax), **always** add corresponding tests to `tests/json-serialization.test.ts` to ensure templates can be serialized and reconstructed correctly. This includes:
+  - New data types (e.g., Decimal, BigInt)
+  - New operators (arithmetic, logical, bitwise)
+  - New syntax features (control flow, expressions)
+  - The reconstructed template must produce identical output to the original
 
 ### Making Changes
 
 1. **Parser changes**: Update `parser.ts` → regenerate AST → update `template.ts` reconstruction if needed
 2. **New operators**: Add to `OPERATORS` table in `exprParser.ts` with precedence, implement in `evaluator.ts`
 3. **New node types**: Define in `ast.ts` → implement parsing, rendering, analysis, reconstruction
-4. **Always verify**: Run tests after any changes to parser/evaluator (template syntax is fragile)
+4. **New data types/features**: Add tests to `tests/json-serialization.test.ts` for serialization round-trip
+5. **Always verify**: Run tests after any changes to parser/evaluator (template syntax is fragile)
 
 ## Project-Specific Conventions
 
@@ -92,6 +98,8 @@ yarn clean               # Remove dist/
 - `toJSON()` → AST → `JSON.stringify()` → storage/network
 - `fromJSON()` → AST → `reconstructTemplate()` → `new Template()` → same behavior
 - Reconstruction must preserve exact template syntax for variables/methods extraction
+- **CRITICAL**: Always test new features with JSON serialization in `tests/json-serialization.test.ts`
+- When adding new operators, data types, or syntax features, verify the reconstructed template produces identical output to the original
 
 ## Common Pitfalls
 
@@ -100,6 +108,7 @@ yarn clean               # Remove dist/
 - **Comments render as empty string** - not removed from AST (for analysis)
 - **Missing closing tags** - parser throws, must be caught by consumer
 - **Operator precedence** - use parentheses in complex expressions to avoid surprises
+- **Forgetting JSON serialization tests** - new features must work after `toJSON()`/`fromJSON()` round-trip
 
 ---
 
@@ -166,6 +175,41 @@ If durable debugging helpers are necessary, extract them into clearly documented
 
 ## Temporary Files for Testing
 When creating temporary files to test code, place all test scripts under `<project_root>/.temp/` to keep the workspace organized and avoid conflicts with the main codebase.
+
+### Running Test Files in .temp/
+**IMPORTANT:** Test files in `.temp/` should be executable demos or scripts, not Jest test files.
+
+#### For TypeScript Files (`.ts`)
+TypeScript files in `.temp/` **cannot** be run directly with `ts-node` or `node` due to ESM/CJS module resolution issues with the `src/` directory. Instead:
+
+1. **Build the project first**: Run `yarn rollup` to generate the `dist/` directory
+2. **Use CommonJS (`.js`) instead**: Convert your TypeScript demo to a JavaScript file using CommonJS `require()` syntax
+3. **Import from dist**: Use `require('../dist/index.js')` to import the built package
+
+**Example of correct .temp/ test file:**
+```javascript
+// .temp/my-demo.js
+const { Template } = require('../dist/index.js');
+const Decimal = require('decimal.js');
+
+const template = new Template('{{ a + b }}');
+console.log(template.render({ a: new Decimal('0.1'), b: new Decimal('0.2') }));
+```
+
+**Run with:**
+```bash
+yarn rollup  # Build first
+node .temp/my-demo.js
+```
+
+**DO NOT:**
+- Use `.ts` files in `.temp/` with imports from `../src/`
+- Try to run TypeScript files directly with `ts-node`
+- Use ESM `import` syntax in `.temp/` files (use CommonJS `require` instead)
+
+#### For Jest Tests
+Jest test files should be placed in the `tests/` directory, not in `.temp/`. The `tests/` directory is properly configured for TypeScript and has access to Jest globals and proper module resolution.
+
 - **Test Case Verification**: Always examine the actual content of test cases to ensure they're testing what they're supposed to test:
   - Read test files completely to understand test logic and assertions
   - Verify that test descriptions match what the test actually does
