@@ -89,25 +89,42 @@ t3.render({ users: [{ name: 'Alice' }, { name: 'Bob' }] });
 const t4 = new Template('{{ matrix[1][2] }}');
 t4.render({ matrix: [[1, 2, 3], [4, 5, 6]] }); 
 // "6"
+
+// Nested indexing - use array element as index
+const t5 = new Template('{{ array[indices[0]] }}');
+t5.render({ 
+  array: ['a', 'b', 'c', 'd', 'e'],
+  indices: [2, 3, 4]
+}); 
+// "c" (array[2])
+
+// Complex nested indexing
+const t6 = new Template('{{ matrix[row[0]][col[1]] }}');
+t6.render({ 
+  matrix: [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+  row: [1],
+  col: [0, 2]
+}); 
+// "6" (matrix[1][2])
 ```
 
 Array indexing works in all contexts:
 
 ```typescript
 // In conditionals
-const t5 = new Template('{% if items[0] == "apple" %}Found apple{% endif %}');
-t5.render({ items: ['apple', 'banana'] }); 
+const t7 = new Template('{% if items[0] == "apple" %}Found apple{% endif %}');
+t7.render({ items: ['apple', 'banana'] }); 
 // "Found apple"
 
 // In method calls
-const t6 = new Template('{{ upper(items[0]) }}');
+const t8 = new Template('{{ upper(items[0]) }}');
 const methods = { upper: (s) => s.toUpperCase() };
-t6.render({ items: ['hello', 'world'] }, methods); 
+t8.render({ items: ['hello', 'world'] }, methods); 
 // "HELLO"
 
 // In loops
-const t7 = new Template('{% for user in users %}{{ user.tags[0] }}, {% endfor %}');
-t7.render({ 
+const t9 = new Template('{% for user in users %}{{ user.tags[0] }}, {% endfor %}');
+t9.render({ 
   users: [
     { tags: ['admin', 'user'] }, 
     { tags: ['guest', 'viewer'] }
