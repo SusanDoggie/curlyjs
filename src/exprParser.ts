@@ -25,6 +25,49 @@
 
 import type { ExprNode, LiteralNode, VariableNode, BinaryOpNode, UnaryOpNode, MethodCallNode } from './ast';
 
+// Operator precedence and associativity table
+// Higher precedence = evaluated first
+// Left associative: operators of same precedence evaluate left-to-right
+// Right associative: operators of same precedence evaluate right-to-left
+const OPERATORS: Record<string, { precedence: number; associativity: 'left' | 'right' }> = {
+  '||': { precedence: 1, associativity: 'left' },
+  '&&': { precedence: 2, associativity: 'left' },
+  '|': { precedence: 3, associativity: 'left' },
+  '^': { precedence: 4, associativity: 'left' },
+  '&': { precedence: 5, associativity: 'left' },
+  '==': { precedence: 6, associativity: 'left' },
+  '!=': { precedence: 6, associativity: 'left' },
+  '<': { precedence: 7, associativity: 'left' },
+  '>': { precedence: 7, associativity: 'left' },
+  '<=': { precedence: 7, associativity: 'left' },
+  '>=': { precedence: 7, associativity: 'left' },
+  '<<': { precedence: 8, associativity: 'left' },
+  '>>': { precedence: 8, associativity: 'left' },
+  '>>>': { precedence: 8, associativity: 'left' },
+  '+': { precedence: 9, associativity: 'left' },
+  '-': { precedence: 9, associativity: 'left' },
+  '*': { precedence: 10, associativity: 'left' },
+  '/': { precedence: 10, associativity: 'left' },
+  '%': { precedence: 10, associativity: 'left' },
+  '**': { precedence: 11, associativity: 'right' }, // Exponentiation is right-associative
+};
+
+const UNARY_OPERATORS = ['!', '~'];
+
+type Token =
+  | { type: 'number'; value: number }
+  | { type: 'string'; value: string }
+  | { type: 'boolean'; value: boolean }
+  | { type: 'variable'; name: string }
+  | { type: 'operator'; operator: string }
+  | { type: 'unary'; operator: string }
+  | { type: 'lparen' }
+  | { type: 'rparen' }
+  | { type: 'lbracket' }
+  | { type: 'rbracket' }
+  | { type: 'comma' }
+  | { type: 'method'; name: string };
+
 function createLiteralNode(value: string | number | boolean | any[]): LiteralNode {
   return {
     type: 'literal',
@@ -40,7 +83,7 @@ function createVariableNode(name: string): VariableNode {
 }
 
 function createBinaryOpNode(
-  operator: '||' | '&&' | '==' | '!=' | '>' | '<' | '>=' | '<=' | '+' | '-' | '*' | '/',
+  operator: '||' | '&&' | '==' | '!=' | '>' | '<' | '>=' | '<=' | '+' | '-' | '*' | '/' | '%' | '**' | '&' | '|' | '^' | '<<' | '>>' | '>>>',
   left: ExprNode,
   right: ExprNode
 ): BinaryOpNode {
@@ -52,7 +95,7 @@ function createBinaryOpNode(
   };
 }
 
-function createUnaryOpNode(operator: '!', operand: ExprNode): UnaryOpNode {
+function createUnaryOpNode(operator: '!' | '~', operand: ExprNode): UnaryOpNode {
   return {
     type: 'unaryOp',
     operator,
@@ -66,67 +109,6 @@ function createMethodCallNode(methodName: string, args: ExprNode[]): MethodCallN
     methodName,
     args
   };
-}
-
-function findOperatorPosition(expr: string, operator: string): number {
-  // Find operator outside of strings, parentheses, and brackets
-  let depth = 0;
-  let inQuote = false;
-  let quoteChar = '';
-  
-  for (let i = 0; i < expr.length - operator.length + 1; i++) {
-    const char = expr[i];
-    const prevChar = i > 0 ? expr[i - 1] : '';
-    
-    if ((char === '"' || char === "'") && prevChar !== '\\') {
-      if (!inQuote) {
-        inQuote = true;
-        quoteChar = char;
-      } else if (char === quoteChar) {
-        inQuote = false;
-        quoteChar = '';
-      }
-    }
-    
-    if (!inQuote) {
-      if (char === '(' || char === '[') depth++;
-      if (char === ')' || char === ']') depth--;
-      
-      if (depth === 0 && expr.substring(i, i + operator.length) === operator) {
-        return i;
-      }
-    }
-  }
-  
-  return -1;
-}
-
-function splitArguments(argExprs: string): string[] {
-  const args: string[] = [];
-  let depth = 0, start = 0, inQuote = false, quoteChar = '';
-  
-  for (let i = 0; i < argExprs.length; i++) {
-    const char = argExprs[i];
-    if ((char === '"' || char === "'") && (!inQuote || char === quoteChar)) {
-      if (!inQuote) {
-        inQuote = true;
-        quoteChar = char;
-      } else {
-        inQuote = false;
-        quoteChar = '';
-      }
-    }
-    if (!inQuote) {
-      if (char === '(' || char === '[') depth++;
-      if (char === ')' || char === ']') depth--;
-      if (char === ',' && depth === 0) {
-        args.push(argExprs.slice(start, i).trim());
-        start = i + 1;
-      }
-    }
-  }
-  if (start < argExprs.length) args.push(argExprs.slice(start).trim());
-  return args;
 }
 
 function parseStringLiteral(str: string): string {
@@ -154,209 +136,395 @@ function parseStringLiteral(str: string): string {
   return result;
 }
 
-function parseArrayLiteral(expr: string): any[] {
-  const arrayContent = expr.slice(1, -1);
-  if (!arrayContent.trim()) return [];
+// Tokenize the expression
+function tokenize(expr: string): Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
   
-  const items: any[] = [];
-  let depth = 0, start = 0, inQuote = false, quoteChar = '';
-  
-  for (let i = 0; i < arrayContent.length; i++) {
-    const char = arrayContent[i];
-    const prevChar = i > 0 ? arrayContent[i - 1] : '';
-    if ((char === '"' || char === "'") && prevChar !== '\\') {
-      if (!inQuote) {
-        inQuote = true;
-        quoteChar = char;
-      } else if (char === quoteChar) {
-        inQuote = false;
-        quoteChar = '';
+  while (i < expr.length) {
+    const char = expr[i];
+
+    // Skip whitespace
+    if (/\s/.test(char)) {
+      i++;
+      continue;
+    }
+
+    // String literals
+    if (char === '"' || char === "'") {
+      const quote = char;
+      let str = char;
+      i++;
+      while (i < expr.length) {
+        str += expr[i];
+        if (expr[i] === quote) {
+          // Count consecutive backslashes before the quote
+          let backslashCount = 0;
+          for (let j = i - 1; j >= 0 && expr[j] === '\\'; j--) {
+            backslashCount++;
+          }
+          // If even number of backslashes (including 0), the quote is not escaped
+          if (backslashCount % 2 === 0) {
+            i++;
+            break;
+          }
+        }
+        i++;
+      }
+      tokens.push({ type: 'string', value: parseStringLiteral(str) });
+      continue;
+    }
+
+    // Numbers
+    if (/\d/.test(char) || (char === '.' && i + 1 < expr.length && /\d/.test(expr[i + 1]))) {
+      let num = '';
+      while (i < expr.length && /[\d.]/.test(expr[i])) {
+        num += expr[i];
+        i++;
+      }
+      tokens.push({ type: 'number', value: parseFloat(num) });
+      continue;
+    }
+
+    // Multi-character operators (check longest first)
+    if (i + 2 < expr.length && expr.substring(i, i + 3) === '>>>') {
+      tokens.push({ type: 'operator', operator: '>>>' });
+      i += 3;
+      continue;
+    }
+
+    if (i + 1 < expr.length) {
+      const twoChar = expr.substring(i, i + 2);
+      if (twoChar === '||' || twoChar === '&&' || twoChar === '==' || twoChar === '!=' ||
+        twoChar === '<=' || twoChar === '>=' || twoChar === '<<' || twoChar === '>>' ||
+        twoChar === '**') {
+        tokens.push({ type: 'operator', operator: twoChar });
+        i += 2;
+        continue;
       }
     }
-    if (!inQuote) {
-      if (char === '[') depth++;
-      if (char === ']') depth--;
-      if (char === ',' && depth === 0) {
-        const itemExpr = arrayContent.slice(start, i);
-        const itemNode = parseExpression(itemExpr);
-        // For array literals, we need to evaluate to get the actual value
-        // This is a simplification - in reality we'd need to evaluate the node
-        // For now, we'll store the parsed expression node
-        items.push(itemNode);
-        start = i + 1;
+
+    // Single-character operators
+    if ('+-*/%&|^<>'.includes(char)) {
+      // Check if it's a unary operator
+      const prevToken = tokens[tokens.length - 1];
+      const isUnary = !prevToken ||
+        prevToken.type === 'operator' ||
+        prevToken.type === 'unary' ||
+        prevToken.type === 'lparen' ||
+        prevToken.type === 'comma';
+
+      if ((char === '-' || char === '+') && isUnary) {
+        // Treat as unary minus/plus, but we'll handle minus by negating the next number
+        // For now, we'll parse it as binary and handle in a later pass if needed
+        tokens.push({ type: 'operator', operator: char });
+      } else {
+        tokens.push({ type: 'operator', operator: char });
+      }
+      i++;
+      continue;
+    }
+
+    // Unary operators
+    if (char === '!' || char === '~') {
+      tokens.push({ type: 'unary', operator: char });
+      i++;
+      continue;
+    }
+
+    // Parentheses and brackets
+    if (char === '(') {
+      tokens.push({ type: 'lparen' });
+      i++;
+      continue;
+    }
+    if (char === ')') {
+      tokens.push({ type: 'rparen' });
+      i++;
+      continue;
+    }
+    if (char === '[') {
+      tokens.push({ type: 'lbracket' });
+      i++;
+      continue;
+    }
+    if (char === ']') {
+      tokens.push({ type: 'rbracket' });
+      i++;
+      continue;
+    }
+    if (char === ',') {
+      tokens.push({ type: 'comma' });
+      i++;
+      continue;
+    }
+
+    // Identifiers (variables, booleans, method names)
+    if (/[a-zA-Z_]/.test(char)) {
+      let ident = '';
+      while (i < expr.length && /[a-zA-Z0-9_.]/.test(expr[i])) {
+        ident += expr[i];
+        i++;
+      }
+
+      // Check if next non-whitespace is '(' for method call
+      let j = i;
+      while (j < expr.length && /\s/.test(expr[j])) j++;
+      if (j < expr.length && expr[j] === '(') {
+        tokens.push({ type: 'method', name: ident });
+      } else if (ident === 'true') {
+        tokens.push({ type: 'boolean', value: true });
+      } else if (ident === 'false') {
+        tokens.push({ type: 'boolean', value: false });
+      } else {
+        tokens.push({ type: 'variable', name: ident });
+      }
+      continue;
+    }
+
+    throw new Error(`Unexpected character: ${char} at position ${i}`);
+  }
+  
+  return tokens;
+}
+
+// Shunting-yard algorithm to convert infix to postfix (RPN)
+function infixToPostfix(tokens: Token[]): Token[] {
+  const output: Token[] = [];
+  const operatorStack: Token[] = [];
+  
+  // Track argument counts for method calls and array elements
+  // Each entry: { commaCount: number, hasArgs: boolean, isArray: boolean }
+  const argCountStack: Array<{ commaCount: number; hasArgs: boolean; isArray: boolean }> = [];
+  
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    if (token.type === 'number' || token.type === 'string' ||
+      token.type === 'boolean' || token.type === 'variable') {
+      output.push(token);
+      // Mark that we've seen an argument if we're inside a method call
+      if (argCountStack.length > 0) {
+        argCountStack[argCountStack.length - 1].hasArgs = true;
+      }
+    }
+    else if (token.type === 'method') {
+      operatorStack.push(token);
+      // Push lparen implicitly - we'll track args starting now
+    }
+    else if (token.type === 'comma') {
+      // Pop operators until we find a left parenthesis or bracket
+      while (operatorStack.length > 0 &&
+        operatorStack[operatorStack.length - 1].type !== 'lparen' &&
+        operatorStack[operatorStack.length - 1].type !== 'lbracket') {
+        output.push(operatorStack.pop()!);
+      }
+      // Increment comma count for the current method call or array
+      if (argCountStack.length > 0) {
+        argCountStack[argCountStack.length - 1].commaCount++;
+      }
+    }
+    else if (token.type === 'operator') {
+      const op1 = OPERATORS[token.operator];
+      while (operatorStack.length > 0) {
+        const top = operatorStack[operatorStack.length - 1];
+        if (top.type === 'operator') {
+          const op2 = OPERATORS[top.operator];
+          if ((op1.associativity === 'left' && op1.precedence <= op2.precedence) ||
+            (op1.associativity === 'right' && op1.precedence < op2.precedence)) {
+            output.push(operatorStack.pop()!);
+          } else {
+            break;
+          }
+        } else if (top.type === 'unary') {
+          output.push(operatorStack.pop()!);
+        } else {
+          break;
+        }
+      }
+      operatorStack.push(token);
+      // If we pushed an operator and we're inside a method call, mark that we have args
+      if (argCountStack.length > 0) {
+        argCountStack[argCountStack.length - 1].hasArgs = true;
+      }
+    }
+    else if (token.type === 'unary') {
+      operatorStack.push(token);
+      // If we pushed a unary operator and we're inside a method call, mark that we have args
+      if (argCountStack.length > 0) {
+        argCountStack[argCountStack.length - 1].hasArgs = true;
+      }
+    }
+    else if (token.type === 'lparen') {
+      // Check if this lparen is for a method call
+      if (operatorStack.length > 0 && operatorStack[operatorStack.length - 1].type === 'method') {
+        // Start tracking arguments for this method
+        argCountStack.push({ commaCount: 0, hasArgs: false, isArray: false });
+      }
+      operatorStack.push(token);
+    }
+    else if (token.type === 'rparen') {
+      // Pop operators until we find a left parenthesis
+      while (operatorStack.length > 0 && operatorStack[operatorStack.length - 1].type !== 'lparen') {
+        output.push(operatorStack.pop()!);
+      }
+      if (operatorStack.length === 0) {
+        throw new Error('Mismatched parentheses');
+      }
+      operatorStack.pop(); // Remove the left parenthesis
+
+      // Check if there's a method call
+      if (operatorStack.length > 0 && operatorStack[operatorStack.length - 1].type === 'method') {
+        const methodToken = operatorStack.pop()!;
+        const argInfo = argCountStack.pop();
+        // Argument count = commas + 1 (if there are any args at all)
+        const argCount = argInfo && argInfo.hasArgs ? argInfo.commaCount + 1 : 0;
+        (methodToken as any).argCount = argCount;
+        output.push(methodToken);
+
+        // If we just completed a method and we're still inside another method or array, mark hasArgs
+        if (argCountStack.length > 0) {
+          argCountStack[argCountStack.length - 1].hasArgs = true;
+        }
+      }
+    }
+    else if (token.type === 'lbracket') {
+      operatorStack.push(token);
+      // Start tracking elements for this array
+      argCountStack.push({ commaCount: 0, hasArgs: false, isArray: true });
+    }
+    else if (token.type === 'rbracket') {
+      // Pop operators until we find a left bracket
+      while (operatorStack.length > 0 && operatorStack[operatorStack.length - 1].type !== 'lbracket') {
+        output.push(operatorStack.pop()!);
+      }
+      if (operatorStack.length === 0) {
+        throw new Error('Mismatched brackets');
+      }
+      operatorStack.pop(); // Remove the left bracket
+
+      // Get element count and create array marker
+      const argInfo = argCountStack.pop();
+      const elementCount = argInfo && argInfo.hasArgs ? argInfo.commaCount + 1 : 0;
+      // Push array marker with element count
+      output.push({ type: 'operator', operator: '[]', argCount: elementCount } as any);
+
+      // If we just completed an array and we're still inside a method or another array, mark hasArgs
+      if (argCountStack.length > 0) {
+        argCountStack[argCountStack.length - 1].hasArgs = true;
       }
     }
   }
-  if (start < arrayContent.length) {
-    const itemExpr = arrayContent.slice(start);
-    const itemNode = parseExpression(itemExpr);
-    items.push(itemNode);
+  
+  // Pop remaining operators
+  while (operatorStack.length > 0) {
+    const top = operatorStack.pop()!;
+    if (top.type === 'lparen' || top.type === 'rparen') {
+      throw new Error('Mismatched parentheses');
+    }
+    output.push(top);
   }
   
-  // For array literals, we need to return the expression nodes
-  // But the LiteralNode expects actual values
-  // We'll handle this by evaluating simple literals during parsing
-  const evaluatedItems = items.map(item => {
-    if (item.type === 'literal') {
-      return item.value;
+  return output;
+}// Build AST from postfix notation (RPN)
+function buildASTFromPostfix(postfix: Token[]): ExprNode {
+  const stack: ExprNode[] = [];
+
+  for (const token of postfix) {
+    if (token.type === 'number') {
+      stack.push(createLiteralNode(token.value));
     }
-    // For non-literal items, we can't evaluate them at parse time
-    // We'll need to handle this differently - return the node itself
-    return item;
-  });
+    else if (token.type === 'string') {
+      stack.push(createLiteralNode(token.value));
+    }
+    else if (token.type === 'boolean') {
+      stack.push(createLiteralNode(token.value));
+    }
+    else if (token.type === 'variable') {
+      stack.push(createVariableNode(token.name));
+    }
+    else if (token.type === 'unary') {
+      const operand = stack.pop();
+      if (!operand) throw new Error('Invalid expression: missing operand for unary operator');
+      stack.push(createUnaryOpNode(token.operator as '!' | '~', operand));
+    }
+    else if (token.type === 'operator') {
+      if (token.operator === '[]') {
+        // Build array from stack - elementCount is stored in token.argCount
+        const elementCount = (token as any).argCount || 0;
+        const items: ExprNode[] = [];
+
+        for (let i = 0; i < elementCount; i++) {
+          if (stack.length > 0) {
+            items.unshift(stack.pop()!);
+          }
+        }
+
+        stack.push(createLiteralNode(items));
+        continue;
+      }
+      
+      const right = stack.pop();
+      const left = stack.pop();
+      if (!left || !right) throw new Error('Invalid expression: missing operands');
+      stack.push(createBinaryOpNode(
+        token.operator as any,
+        left,
+        right
+      ));
+    }
+    else if (token.type === 'method') {
+      // Method calls need special handling - we need to track argument count
+      // For now, collect all arguments that were pushed since the method was encountered
+      // This is stored in the token during parsing
+      const argCount = (token as any).argCount || 0;
+      const args: ExprNode[] = [];
+
+      for (let i = 0; i < argCount; i++) {
+        if (stack.length > 0) {
+          args.unshift(stack.pop()!);
+        }
+      }
+
+      stack.push(createMethodCallNode(token.name, args));
+    }
+  }
   
-  return evaluatedItems;
+  if (stack.length !== 1) {
+    throw new Error('Invalid expression');
+  }
+  
+  return stack[0];
 }
 
 export function parseExpression(expr: string): ExprNode {
   expr = expr.trim();
   
-  // Handle logical OR operator (||) - lowest precedence
-  const orPos = findOperatorPosition(expr, '||');
-  if (orPos !== -1) {
-    const left = expr.substring(0, orPos).trim();
-    const right = expr.substring(orPos + 2).trim();
-    return createBinaryOpNode('||', parseExpression(left), parseExpression(right));
+  // Handle empty expression
+  if (!expr) {
+    return createLiteralNode('');
   }
   
-  // Handle logical AND operator (&&)
-  const andPos = findOperatorPosition(expr, '&&');
-  if (andPos !== -1) {
-    const left = expr.substring(0, andPos).trim();
-    const right = expr.substring(andPos + 2).trim();
-    return createBinaryOpNode('&&', parseExpression(left), parseExpression(right));
-  }
-  
-  // Handle logical NOT operator (!)
-  if (expr.startsWith('!')) {
-    const innerExpr = expr.substring(1).trim();
-    // Remove parentheses if present
-    let exprToEval = innerExpr;
-    if (innerExpr.startsWith('(') && innerExpr.endsWith(')')) {
-      exprToEval = innerExpr.substring(1, innerExpr.length - 1);
-    }
-    return createUnaryOpNode('!', parseExpression(exprToEval));
-  }
-  
-  // Handle parentheses for grouping
-  if (expr.startsWith('(') && expr.endsWith(')')) {
-    return parseExpression(expr.substring(1, expr.length - 1));
-  }
-  
-  // Handle comparison operators
-  const comparisonOps: Array<'==' | '!=' | '>=' | '<=' | '>' | '<'> = ['==', '!=', '>=', '<=', '>', '<'];
-  let foundOp: typeof comparisonOps[number] | null = null;
-  let opPos = -1;
-  
-  let depth = 0;
-  let inQuote = false;
-  let quoteChar = '';
-  
-  for (let i = 0; i < expr.length; i++) {
-    const char = expr[i];
-    const prevChar = i > 0 ? expr[i - 1] : '';
-    
-    if ((char === '"' || char === "'") && prevChar !== '\\') {
-      if (!inQuote) {
-        inQuote = true;
-        quoteChar = char;
-      } else if (char === quoteChar) {
-        inQuote = false;
-        quoteChar = '';
-      }
-    }
-    
-    if (!inQuote) {
-      if (char === '(' || char === '[') depth++;
-      if (char === ')' || char === ']') depth--;
-      
-      if (depth === 0) {
-        for (const op of comparisonOps) {
-          if (expr.substring(i, i + op.length) === op) {
-            foundOp = op;
-            opPos = i;
-            break;
-          }
-        }
-        if (foundOp) break;
-      }
-    }
-  }
-  
-  if (foundOp) {
-    const left = expr.substring(0, opPos).trim();
-    const right = expr.substring(opPos + foundOp.length).trim();
-    return createBinaryOpNode(foundOp, parseExpression(left), parseExpression(right));
-  }
-  
-  // Handle arithmetic operators (search from right for left-associativity)
-  const arithmeticOps: Array<'+' | '-' | '*' | '/'> = ['+', '-', '*', '/'];
-  let foundArithOp: '+' | '-' | '*' | '/' | null = null;
-  let arithOpPos = -1;
-  depth = 0;
-  inQuote = false;
-  quoteChar = '';
-  
-  for (let i = expr.length - 1; i >= 0; i--) {
-    const char = expr[i];
-    const prevChar = i > 0 ? expr[i - 1] : '';
-    
-    if ((char === '"' || char === "'") && prevChar !== '\\') {
-      if (!inQuote) {
-        inQuote = true;
-        quoteChar = char;
-      } else if (char === quoteChar) {
-        inQuote = false;
-        quoteChar = '';
-      }
-    }
-    
-    if (!inQuote) {
-      if (char === ')' || char === ']') depth++;
-      if (char === '(' || char === '[') depth--;
-      
-      if (depth === 0 && arithmeticOps.includes(char as any)) {
-        foundArithOp = char as '+' | '-' | '*' | '/';
-        arithOpPos = i;
-        break;
-      }
-    }
-  }
-  
-  if (foundArithOp) {
-    const left = expr.substring(0, arithOpPos).trim();
-    const right = expr.substring(arithOpPos + 1).trim();
-    return createBinaryOpNode(foundArithOp, parseExpression(left), parseExpression(right));
-  }
-  
-  // Check for method call: methodName(args) or methodName (args)
-  const methodCall = expr.match(/^(\w+)\s*\((.*)\)$/);
-  if (methodCall) {
-    const [, methodName, argExprs] = methodCall;
-    const argStrings = splitArguments(argExprs);
-    const argNodes = argStrings.map(arg => parseExpression(arg));
-    return createMethodCallNode(methodName, argNodes);
-  }
-  
-  // Check for string literal
+  // Quick path for simple literals
+  if (expr === 'true') return createLiteralNode(true);
+  if (expr === 'false') return createLiteralNode(false);
   if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
     return createLiteralNode(parseStringLiteral(expr));
   }
-  
-  // Check for array literal
-  if (expr.startsWith('[') && expr.endsWith(']')) {
-    return createLiteralNode(parseArrayLiteral(expr));
-  }
-  
-  // Check for boolean literal
-  if (expr === 'true') return createLiteralNode(true);
-  if (expr === 'false') return createLiteralNode(false);
-  
-  // Check for number literal
   if (!isNaN(Number(expr)) && expr !== '') {
     return createLiteralNode(Number(expr));
   }
+  if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(expr)) {
+    return createVariableNode(expr);
+  }
   
-  // Otherwise, it's a variable/property access
-  return createVariableNode(expr);
+  // Parse complex expressions using Shunting-yard algorithm
+  try {
+    const tokens = tokenize(expr);
+    const postfix = infixToPostfix(tokens);
+    return buildASTFromPostfix(postfix);
+  } catch (error) {
+    // Fallback: treat as variable
+    return createVariableNode(expr);
+  }
 }

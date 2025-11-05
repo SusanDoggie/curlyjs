@@ -48,10 +48,10 @@ describe('Arithmetic Operators', () => {
     expect(t.render({ a: 10, b: 2 })).toBe('5');
   });
 
-  test('renders complex arithmetic (left-to-right evaluation)', () => {
+  test('renders complex arithmetic (with proper precedence)', () => {
     const t = new Template('{{ a + b * c }}');
-    // Template engine evaluates left-to-right: (a + b) * c = (2 + 3) * 4 = 20
-    expect(t.render({ a: 2, b: 3, c: 4 })).toBe('20');
+    // With proper operator precedence: a + (b * c) = 2 + (3 * 4) = 2 + 12 = 14
+    expect(t.render({ a: 2, b: 3, c: 4 })).toBe('14');
   });
 });
 

@@ -76,6 +76,22 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
           return leftVal * rightVal;
         case '/':
           return leftVal / rightVal;
+        case '%':
+          return leftVal % rightVal;
+        case '**':
+          return Math.pow(leftVal, rightVal);
+        case '&':
+          return leftVal & rightVal;
+        case '|':
+          return leftVal | rightVal;
+        case '^':
+          return leftVal ^ rightVal;
+        case '<<':
+          return leftVal << rightVal;
+        case '>>':
+          return leftVal >> rightVal;
+        case '>>>':
+          return leftVal >>> rightVal;
       }
       break;
 
@@ -84,6 +100,8 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
       switch (node.operator) {
         case '!':
           return !operandVal;
+        case '~':
+          return ~operandVal;
       }
       break;
 
@@ -253,6 +271,36 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     return leftVal && rightVal;
   }
   
+  // Handle bitwise OR operator (|)
+  let bitwiseOrPos = findLogicalOperator(expr, '|');
+  if (bitwiseOrPos !== -1 && expr.substring(bitwiseOrPos, bitwiseOrPos + 2) !== '||') {
+    const left = expr.substring(0, bitwiseOrPos).trim();
+    const right = expr.substring(bitwiseOrPos + 1).trim();
+    const leftVal = evalExpr(left, data, methods);
+    const rightVal = evalExpr(right, data, methods);
+    return leftVal | rightVal;
+  }
+
+  // Handle bitwise XOR operator (^)
+  let bitwiseXorPos = findLogicalOperator(expr, '^');
+  if (bitwiseXorPos !== -1) {
+    const left = expr.substring(0, bitwiseXorPos).trim();
+    const right = expr.substring(bitwiseXorPos + 1).trim();
+    const leftVal = evalExpr(left, data, methods);
+    const rightVal = evalExpr(right, data, methods);
+    return leftVal ^ rightVal;
+  }
+
+  // Handle bitwise AND operator (&)
+  let bitwiseAndPos = findLogicalOperator(expr, '&');
+  if (bitwiseAndPos !== -1 && expr.substring(bitwiseAndPos, bitwiseAndPos + 2) !== '&&') {
+    const left = expr.substring(0, bitwiseAndPos).trim();
+    const right = expr.substring(bitwiseAndPos + 1).trim();
+    const leftVal = evalExpr(left, data, methods);
+    const rightVal = evalExpr(right, data, methods);
+    return leftVal & rightVal;
+  }
+
   // Handle logical NOT operator (highest precedence for unary operator)
   if (expr.startsWith('!')) {
     const innerExpr = expr.substring(1).trim();
@@ -265,25 +313,100 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     return !innerVal;
   }
 
+  // Handle bitwise NOT operator (~)
+  if (expr.startsWith('~')) {
+    const innerExpr = expr.substring(1).trim();
+    // Remove parentheses if present
+    let exprToEval = innerExpr;
+    if (innerExpr.startsWith('(') && innerExpr.endsWith(')')) {
+      exprToEval = innerExpr.substring(1, innerExpr.length - 1);
+    }
+    const innerVal = evalExpr(exprToEval, data, methods);
+    return ~innerVal;
+  }
+
   // Handle parentheses for grouping
   if (expr.startsWith('(') && expr.endsWith(')')) {
     // Remove outer parentheses and evaluate
     return evalExpr(expr.substring(1, expr.length - 1), data, methods);
   }
   
-  // Handle comparison operators (find operator not inside quotes or parentheses)
-  const comparisonOps = ['==', '!=', '>=', '<=', '>', '<'];
+  // Handle bitwise shift operators (>>>, >>, <<) - MUST BE BEFORE comparison operators
+  const shiftOps = ['>>>', '>>', '<<'];
   let foundOp: string | null = null;
   let opPos = -1;
-  
-  // Find comparison operator outside of strings and parentheses
   let depth = 0;
   let inQuote = false;
   let quoteChar = '';
   
+  for (let i = expr.length - 1; i >= 0; i--) { // Search from right for left-associativity
+    const char = expr[i];
+    const prevChar = i > 0 ? expr[i - 1] : '';
+
+    if ((char === '"' || char === "'") && prevChar !== '\\') {
+      if (!inQuote) {
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === quoteChar) {
+        inQuote = false;
+        quoteChar = '';
+      }
+    }
+
+    if (!inQuote) {
+      if (char === ')' || char === ']') depth++;
+      if (char === '(' || char === '[') depth--;
+
+      if (depth === 0) {
+        // Check for >>> first (longest operator)
+        if (expr.substring(i, i + 3) === '>>>') {
+          foundOp = '>>>';
+          opPos = i;
+          break;
+        }
+        // Then check for >> and <<
+        if (expr.substring(i, i + 2) === '>>') {
+          foundOp = '>>';
+          opPos = i;
+          break;
+        }
+        if (expr.substring(i, i + 2) === '<<') {
+          foundOp = '<<';
+          opPos = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (foundOp) {
+    const left = expr.substring(0, opPos).trim();
+    const right = expr.substring(opPos + foundOp.length).trim();
+    const leftVal = evalExpr(left, data, methods);
+    const rightVal = evalExpr(right, data, methods);
+
+    switch (foundOp) {
+      case '<<':
+        return leftVal << rightVal;
+      case '>>':
+        return leftVal >> rightVal;
+      case '>>>':
+        return leftVal >>> rightVal;
+    }
+  }  // Handle comparison operators (find operator not inside quotes or parentheses) - MUST BE AFTER shift operators
+  const comparisonOps = ['==', '!=', '>=', '<=', '>', '<'];
+  foundOp = null;
+  opPos = -1;
+
+  // Find comparison operator outside of strings and parentheses
+  depth = 0;
+  inQuote = false;
+  quoteChar = '';
+
   for (let i = 0; i < expr.length; i++) {
     const char = expr[i];
     const prevChar = i > 0 ? expr[i - 1] : '';
+    const nextChar = i < expr.length - 1 ? expr[i + 1] : '';
     
     if ((char === '"' || char === "'") && prevChar !== '\\') {
       if (!inQuote) {
@@ -303,6 +426,20 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
         // Check for two-character operators first
         for (const op of comparisonOps) {
           if (expr.substring(i, i + op.length) === op) {
+            // Skip if it's part of a shift operator (<<, >>, >>>)
+            const next2Chars = expr.substring(i + 1, i + 3);
+            const nextChar = expr[i + 1];
+
+            if (op === '<' && nextChar === '<') {
+              continue; // It's <<
+            }
+            if (op === '>' && (nextChar === '>' || next2Chars === '>>')) {
+              continue; // It's >> or >>>
+            }
+            if (op === '>=' && nextChar === '>') {
+              continue; // Part of >>> after the first >
+            }
+
             foundOp = op;
             opPos = i;
             break;
@@ -335,8 +472,8 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     }
   }
 
-  // Handle arithmetic operators (same approach)
-  const arithmeticOps = ['+', '-', '*', '/'];
+  // Handle addition and subtraction operators (lower precedence than multiplication/division)
+  const addSubOps = ['+', '-'];
   foundOp = null;
   opPos = -1;
   depth = 0;
@@ -361,7 +498,7 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
       if (char === ')' || char === ']') depth++;
       if (char === '(' || char === '[') depth--;
       
-      if (depth === 0 && arithmeticOps.includes(char)) {
+      if (depth === 0 && addSubOps.includes(char)) {
         foundOp = char;
         opPos = i;
         break;
@@ -380,11 +517,75 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
         return leftVal + rightVal;
       case '-':
         return leftVal - rightVal;
+    }
+  }
+
+  // Handle multiplication, division, and modulo operators (higher precedence than addition/subtraction)
+  const mulDivModOps = ['*', '/', '%'];
+  foundOp = null;
+  opPos = -1;
+  depth = 0;
+  inQuote = false;
+  quoteChar = '';
+
+  for (let i = expr.length - 1; i >= 0; i--) { // Search from right for left-associativity
+    const char = expr[i];
+    const prevChar = i > 0 ? expr[i - 1] : '';
+    const nextChar = i < expr.length - 1 ? expr[i + 1] : '';
+
+    if ((char === '"' || char === "'") && prevChar !== '\\') {
+      if (!inQuote) {
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === quoteChar) {
+        inQuote = false;
+        quoteChar = '';
+      }
+    }
+
+    if (!inQuote) {
+      if (char === ')' || char === ']') depth++;
+      if (char === '(' || char === '[') depth--;
+
+      if (depth === 0) {
+        // Skip if it's part of ** operator
+        if (char === '*' && (prevChar === '*' || nextChar === '*')) {
+          continue;
+        }
+
+        if (mulDivModOps.includes(char)) {
+          foundOp = char;
+          opPos = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (foundOp) {
+    const left = expr.substring(0, opPos).trim();
+    const right = expr.substring(opPos + 1).trim();
+    const leftVal = evalExpr(left, data, methods);
+    const rightVal = evalExpr(right, data, methods);
+
+    switch (foundOp) {
       case '*':
         return leftVal * rightVal;
       case '/':
         return leftVal / rightVal;
+      case '%':
+        return leftVal % rightVal;
     }
+  }
+
+  // Handle exponentiation operator (** - highest precedence, right-associative)
+  let expPos = findLogicalOperator(expr, '**');
+  if (expPos !== -1) {
+    const left = expr.substring(0, expPos).trim();
+    const right = expr.substring(expPos + 2).trim();
+    const leftVal = evalExpr(left, data, methods);
+    const rightVal = evalExpr(right, data, methods);
+    return Math.pow(leftVal, rightVal);
   }
 
   // Check for method call: methodName(args)

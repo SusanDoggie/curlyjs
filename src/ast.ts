@@ -40,14 +40,14 @@ export interface VariableNode extends BaseExprNode {
 
 export interface BinaryOpNode extends BaseExprNode {
   type: 'binaryOp';
-  operator: '||' | '&&' | '==' | '!=' | '>' | '<' | '>=' | '<=' | '+' | '-' | '*' | '/';
+  operator: '||' | '&&' | '==' | '!=' | '>' | '<' | '>=' | '<=' | '+' | '-' | '*' | '/' | '%' | '**' | '&' | '|' | '^' | '<<' | '>>' | '>>>';
   left: ExprNode;
   right: ExprNode;
 }
 
 export interface UnaryOpNode extends BaseExprNode {
   type: 'unaryOp';
-  operator: '!';
+  operator: '!' | '~';
   operand: ExprNode;
 }
 
