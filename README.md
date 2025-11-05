@@ -10,7 +10,7 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 - 🎯 **Simple Syntax** - Clean, readable Jinja2-inspired template syntax
 - 🔄 **Control Flow** - Full support for conditionals (`if/elif/else`) and loops (`for`)
 - 💬 **Comments** - Template comments with `{# ... #}` syntax
-- 📊 **Operators** - Comparison, logical, and arithmetic operators
+- 📊 **Operators** - Rich operator support including arithmetic (`+`, `-`, `*`, `/`, `%`, `**`), comparison, logical (`&&`, `||`, `!`), and bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`, `>>>`)
 - 🔧 **Custom Methods** - Extend templates with custom functions and method calls in loops
 - 🌳 **Nested Structures** - Support for deeply nested objects and arrays
 - 📝 **Variable & Method Extraction** - Automatically detect variables and methods used in templates
@@ -181,20 +181,58 @@ t.render({ age: 21 }); // "Adult"
 
 #### Arithmetic Operators
 
-Supported operators: `+`, `-`, `*`, `/`
+Supported operators: `+`, `-`, `*`, `/`, `%` (modulo), `**` (exponentiation)
 
 ```typescript
 const t = new Template('{{ a + b }}');
 t.render({ a: 5, b: 3 }); // "8"
+
+const t2 = new Template('{{ a % b }}');
+t2.render({ a: 10, b: 3 }); // "1"
+
+const t3 = new Template('{{ a ** b }}');
+t3.render({ a: 2, b: 3 }); // "8"
 ```
 
-**Note:** Arithmetic operations are evaluated left-to-right without standard operator precedence.
+#### Bitwise Operators
+
+Supported operators:
+- `&` (AND) - Bitwise AND
+- `|` (OR) - Bitwise OR
+- `^` (XOR) - Bitwise XOR
+- `~` (NOT) - Bitwise NOT (unary)
+- `<<` (left shift)
+- `>>` (signed right shift)
+- `>>>` (unsigned right shift)
+
+```typescript
+const t1 = new Template('{{ a & b }}');
+t1.render({ a: 5, b: 3 }); // "1" (0101 & 0011 = 0001)
+
+const t2 = new Template('{{ a | b }}');
+t2.render({ a: 5, b: 3 }); // "7" (0101 | 0011 = 0111)
+
+const t3 = new Template('{{ a ^ b }}');
+t3.render({ a: 5, b: 3 }); // "6" (0101 ^ 0011 = 0110)
+
+const t4 = new Template('{{ ~a }}');
+t4.render({ a: 5 }); // "-6" (~0101 = 1010 in two's complement)
+
+const t5 = new Template('{{ a << b }}');
+t5.render({ a: 5, b: 2 }); // "20" (5 << 2 = 20)
+
+const t6 = new Template('{{ a >> b }}');
+t6.render({ a: 20, b: 2 }); // "5" (20 >> 2 = 5)
+
+const t7 = new Template('{{ a >>> b }}');
+t7.render({ a: -8, b: 2 }); // "1073741822" (unsigned right shift)
+```
 
 #### Logical Operators
 
 - **AND (`&&`)**: Returns true if both operands are true
 - **OR (`||`)**: Returns true if at least one operand is true
-- **NOT (`!`)**: Negates the operand
+- **NOT (`!`)**: Negates the operand (logical NOT)
 
 ```typescript
 // AND
@@ -212,15 +250,35 @@ t3.render({ flag: false }); // "Not flagged"
 
 #### Operator Precedence
 
-1. NOT (`!`) - highest
-2. Comparison operators (`==`, `!=`, `>`, `<`, `>=`, `<=`)
-3. AND (`&&`)
-4. OR (`||`) - lowest
+Operators are evaluated according to the following precedence (highest to lowest):
+
+1. **`**`** - Exponentiation (right-associative)
+2. **`*` `/` `%`** - Multiplication, division, modulo
+3. **`+` `-`** - Addition, subtraction
+4. **`<<` `>>` `>>>`** - Bitwise shifts
+5. **`&`** - Bitwise AND
+6. **`^`** - Bitwise XOR
+7. **`|`** - Bitwise OR
+8. **`<` `>` `<=` `>=`** - Comparison operators
+9. **`==` `!=`** - Equality operators
+10. **`&&`** - Logical AND
+11. **`||`** - Logical OR
+12. **`!` `~`** - Unary operators (highest precedence when used)
 
 Use parentheses to override precedence:
 
 ```typescript
-const t = new Template('{% if (a || b) && c %}Result{% endif %}');
+const t1 = new Template('{{ 2 + 3 * 4 }}');
+t1.render({}); // "14" (multiplication before addition)
+
+const t2 = new Template('{{ (2 + 3) * 4 }}');
+t2.render({}); // "20" (parentheses override precedence)
+
+const t3 = new Template('{{ 2 ** 3 ** 2 }}');
+t3.render({}); // "512" (2 ** (3 ** 2), right-associative)
+
+const t4 = new Template('{% if (a || b) && c %}Result{% endif %}');
+// Logical OR evaluated before AND due to parentheses
 ```
 
 ### Comments
