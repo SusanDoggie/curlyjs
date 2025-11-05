@@ -9,11 +9,12 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 - 🚀 **Lightweight** - Minimal dependencies, small bundle size
 - 🎯 **Simple Syntax** - Clean, readable Jinja2-inspired template syntax
 - 🔄 **Control Flow** - Full support for conditionals (`if/elif/else`) and loops (`for`)
-- � **Comments** - Template comments with `{# ... #}` syntax
-- �📊 **Operators** - Comparison, logical, and arithmetic operators
+- 💬 **Comments** - Template comments with `{# ... #}` syntax
+- 📊 **Operators** - Comparison, logical, and arithmetic operators
 - 🔧 **Custom Methods** - Extend templates with custom functions and method calls in loops
 - 🌳 **Nested Structures** - Support for deeply nested objects and arrays
 - 📝 **Variable & Method Extraction** - Automatically detect variables and methods used in templates
+- 💾 **Serialization** - Serialize templates to JSON and reconstruct them for caching and storage
 - ⚡ **AST-based** - Efficient parsing and rendering via Abstract Syntax Tree
 
 ## Installation
@@ -370,6 +371,98 @@ console.log(t.variables); // ["user", "data"]
 console.log(t.methods);   // ["upper", "getItems", "format"]
 ```
 
+### Template Serialization
+
+Templates can be serialized to JSON and reconstructed, which is useful for:
+- Caching pre-parsed templates
+- Storing templates in databases
+- Transmitting templates over networks
+- Template version control and management
+
+#### Serializing Templates
+
+Use `toJSON()` to get the AST representation:
+
+```typescript
+const template = new Template('{% if user.active %}{{ user.name }}{% endif %}');
+const ast = template.toJSON();
+
+// Save to file
+const fs = require('fs');
+fs.writeFileSync('template.json', JSON.stringify(ast));
+
+// Or send over network
+await fetch('/api/templates', {
+  method: 'POST',
+  body: JSON.stringify(ast)
+});
+```
+
+#### Deserializing Templates
+
+Use `Template.fromJSON()` to reconstruct templates:
+
+```typescript
+// Load from file
+const fs = require('fs');
+const ast = JSON.parse(fs.readFileSync('template.json', 'utf8'));
+const template = Template.fromJSON(ast);
+
+// Use the template normally
+template.render({ user: { active: true, name: 'Alice' } });
+// "Alice"
+```
+
+#### Round-Trip Serialization
+
+Templates maintain their functionality through serialization:
+
+```typescript
+const original = new Template('{% for item in items %}{{ item }}{% endfor %}');
+
+// Serialize
+const ast = original.toJSON();
+const json = JSON.stringify(ast);
+
+// Deserialize
+const loaded = JSON.parse(json);
+const restored = Template.fromJSON(loaded);
+
+// Both produce the same output
+const data = { items: [1, 2, 3] };
+console.log(original.render(data));  // "123"
+console.log(restored.render(data));  // "123"
+
+// Variables and methods are preserved
+console.log(restored.variables);  // Same as original.variables
+console.log(restored.methods);    // Same as original.methods
+```
+
+#### Caching Example
+
+Pre-parse templates for better performance:
+
+```typescript
+const templateCache = new Map();
+
+function getTemplate(templateString) {
+  // Check cache first
+  if (templateCache.has(templateString)) {
+    const ast = templateCache.get(templateString);
+    return Template.fromJSON(ast);
+  }
+  
+  // Parse and cache
+  const template = new Template(templateString);
+  templateCache.set(templateString, template.toJSON());
+  return template;
+}
+
+// Usage
+const t1 = getTemplate('Hello {{ name }}');  // Parse + cache
+const t2 = getTemplate('Hello {{ name }}');  // From cache
+```
+
 ### Nested Structures
 
 curlyjs handles complex nested structures seamlessly:
@@ -435,6 +528,46 @@ Renders the template with the provided data and optional custom methods.
 ```typescript
 const t = new Template('{{ greeting }}, {{ name }}!');
 const result = t.render({ greeting: 'Hello', name: 'World' });
+```
+
+##### `toJSON(): ASTNode[]`
+
+Returns the internal Abstract Syntax Tree (AST) representation of the template. This allows you to serialize the parsed template structure.
+
+**Returns:** Array of AST nodes
+
+**Example:**
+```typescript
+const t = new Template('Hello {{ name }}!');
+const ast = t.toJSON();
+console.log(JSON.stringify(ast));
+// Can be saved to file or transmitted over network
+```
+
+##### `static fromJSON(ast: ASTNode[]): Template`
+
+Reconstructs a Template instance from an AST. The method converts the AST back into the original template string and creates a new Template instance.
+
+**Parameters:**
+- `ast` - Array of AST nodes (from `toJSON()`)
+
+**Returns:** New Template instance
+
+**Example:**
+```typescript
+// Serialize
+const original = new Template('{% for item in items %}{{ item }}{% endfor %}');
+const ast = original.toJSON();
+const serialized = JSON.stringify(ast);
+
+// Store or transmit serialized...
+
+// Deserialize
+const loaded = JSON.parse(serialized);
+const restored = Template.fromJSON(loaded);
+
+// Use restored template
+restored.render({ items: [1, 2, 3] }); // "123"
 ```
 
 ## Complete Example
