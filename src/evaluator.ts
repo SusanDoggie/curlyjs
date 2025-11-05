@@ -24,8 +24,154 @@
 //
 
 import _ from 'lodash';
+import Decimal from 'decimal.js';
 import type { TemplateData, TemplateMethods } from './types';
 import type { ExprNode } from './ast';
+
+// Helper to check if a value is a Decimal instance
+function isDecimal(value: any): value is Decimal {
+  return value instanceof Decimal;
+}
+
+// Helper to convert value to Decimal if it's a number or Decimal
+function toDecimal(value: any): Decimal | null {
+  if (isDecimal(value)) return value;
+  if (typeof value === 'number' || typeof value === 'string') {
+    try {
+      return new Decimal(value);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// Helper to perform arithmetic operations with Decimal support
+function performArithmetic(
+  left: any,
+  right: any,
+  op: '+' | '-' | '*' | '/' | '%' | '**'
+): any {
+  // Special handling for + operator: preserve string concatenation
+  if (op === '+') {
+    // If either operand is a string (but NOT a Decimal or BigInt), use string concatenation
+    if ((typeof left === 'string' && !isDecimal(left)) ||
+      (typeof right === 'string' && !isDecimal(right))) {
+      return String(left) + String(right);
+    }
+  }
+
+  const leftDecimal = toDecimal(left);
+  const rightDecimal = toDecimal(right);
+
+  // If both can be converted to Decimal, use Decimal arithmetic
+  if (leftDecimal !== null && rightDecimal !== null) {
+    switch (op) {
+      case '+':
+        return leftDecimal.plus(rightDecimal);
+      case '-':
+        return leftDecimal.minus(rightDecimal);
+      case '*':
+        return leftDecimal.times(rightDecimal);
+      case '/':
+        return leftDecimal.dividedBy(rightDecimal);
+      case '%':
+        return leftDecimal.modulo(rightDecimal);
+      case '**':
+        return leftDecimal.pow(rightDecimal);
+    }
+  }
+
+  // Handle BigInt arithmetic
+  if (typeof left === 'bigint' || typeof right === 'bigint') {
+    const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
+    const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+
+    switch (op) {
+      case '+':
+        return leftBigInt + rightBigInt;
+      case '-':
+        return leftBigInt - rightBigInt;
+      case '*':
+        return leftBigInt * rightBigInt;
+      case '/':
+        return leftBigInt / rightBigInt;
+      case '%':
+        return leftBigInt % rightBigInt;
+      case '**':
+        return leftBigInt ** rightBigInt;
+    }
+  }
+
+  // Fall back to regular JavaScript arithmetic
+  switch (op) {
+    case '+':
+      return left + right;
+    case '-':
+      return left - right;
+    case '*':
+      return left * right;
+    case '/':
+      return left / right;
+    case '%':
+      return left % right;
+    case '**':
+      return Math.pow(left, right);
+  }
+}
+
+// Helper to perform comparison operations with Decimal and BigInt support
+function performComparison(
+  left: any,
+  right: any,
+  op: '>' | '<' | '>=' | '<='
+): boolean {
+  const leftDecimal = toDecimal(left);
+  const rightDecimal = toDecimal(right);
+
+  // If both can be converted to Decimal, use Decimal comparison
+  if (leftDecimal !== null && rightDecimal !== null) {
+    switch (op) {
+      case '>':
+        return leftDecimal.greaterThan(rightDecimal);
+      case '<':
+        return leftDecimal.lessThan(rightDecimal);
+      case '>=':
+        return leftDecimal.greaterThanOrEqualTo(rightDecimal);
+      case '<=':
+        return leftDecimal.lessThanOrEqualTo(rightDecimal);
+    }
+  }
+
+  // Handle BigInt comparison
+  if (typeof left === 'bigint' || typeof right === 'bigint') {
+    const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
+    const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+
+    switch (op) {
+      case '>':
+        return leftBigInt > rightBigInt;
+      case '<':
+        return leftBigInt < rightBigInt;
+      case '>=':
+        return leftBigInt >= rightBigInt;
+      case '<=':
+        return leftBigInt <= rightBigInt;
+    }
+  }
+
+  // Fall back to regular JavaScript comparison
+  switch (op) {
+    case '>':
+      return left > right;
+    case '<':
+      return left < right;
+    case '>=':
+      return left >= right;
+    case '<=':
+      return left <= right;
+  }
+}
 
 // Evaluate an expression AST node
 export function evalExprNode(node: ExprNode, data: TemplateData, methods: TemplateMethods): any {
@@ -67,30 +213,36 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
           return leftVal || rightVal;
         case '&&':
           return leftVal && rightVal;
-        case '==':
+        case '==': {
+          // Special handling for Decimal and BigInt equality
+          const leftDec = toDecimal(leftVal);
+          const rightDec = toDecimal(rightVal);
+          if (leftDec !== null && rightDec !== null) {
+            return leftDec.equals(rightDec);
+          }
           return _.isEqual(leftVal, rightVal);
-        case '!=':
+        }
+        case '!=': {
+          // Special handling for Decimal and BigInt inequality
+          const leftDec = toDecimal(leftVal);
+          const rightDec = toDecimal(rightVal);
+          if (leftDec !== null && rightDec !== null) {
+            return !leftDec.equals(rightDec);
+          }
           return !_.isEqual(leftVal, rightVal);
+        }
         case '>':
-          return leftVal > rightVal;
         case '<':
-          return leftVal < rightVal;
         case '>=':
-          return leftVal >= rightVal;
         case '<=':
-          return leftVal <= rightVal;
+          return performComparison(leftVal, rightVal, node.operator);
         case '+':
-          return leftVal + rightVal;
         case '-':
-          return leftVal - rightVal;
         case '*':
-          return leftVal * rightVal;
         case '/':
-          return leftVal / rightVal;
         case '%':
-          return leftVal % rightVal;
         case '**':
-          return Math.pow(leftVal, rightVal);
+          return performArithmetic(leftVal, rightVal, node.operator);
         case '&':
           return leftVal & rightVal;
         case '|':
@@ -468,18 +620,29 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     const rightVal = evalExpr(right, data, methods);
     
     switch (foundOp) {
-      case '==':
+      case '==': {
+        // Special handling for Decimal and BigInt equality
+        const leftDec = toDecimal(leftVal);
+        const rightDec = toDecimal(rightVal);
+        if (leftDec !== null && rightDec !== null) {
+          return leftDec.equals(rightDec);
+        }
         return _.isEqual(leftVal, rightVal);
-      case '!=':
+      }
+      case '!=': {
+        // Special handling for Decimal and BigInt inequality
+        const leftDec = toDecimal(leftVal);
+        const rightDec = toDecimal(rightVal);
+        if (leftDec !== null && rightDec !== null) {
+          return !leftDec.equals(rightDec);
+        }
         return !_.isEqual(leftVal, rightVal);
+      }
       case '>':
-        return leftVal > rightVal;
       case '<':
-        return leftVal < rightVal;
       case '>=':
-        return leftVal >= rightVal;
       case '<=':
-        return leftVal <= rightVal;
+        return performComparison(leftVal, rightVal, foundOp);
     }
   }
 
@@ -523,12 +686,7 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     const leftVal = evalExpr(left, data, methods);
     const rightVal = evalExpr(right, data, methods);
     
-    switch (foundOp) {
-      case '+':
-        return leftVal + rightVal;
-      case '-':
-        return leftVal - rightVal;
-    }
+    return performArithmetic(leftVal, rightVal, foundOp as '+' | '-');
   }
 
   // Handle multiplication, division, and modulo operators (higher precedence than addition/subtraction)
@@ -579,14 +737,7 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     const leftVal = evalExpr(left, data, methods);
     const rightVal = evalExpr(right, data, methods);
 
-    switch (foundOp) {
-      case '*':
-        return leftVal * rightVal;
-      case '/':
-        return leftVal / rightVal;
-      case '%':
-        return leftVal % rightVal;
-    }
+    return performArithmetic(leftVal, rightVal, foundOp as '*' | '/' | '%');
   }
 
   // Handle exponentiation operator (** - highest precedence, right-associative)
@@ -596,7 +747,7 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     const right = expr.substring(expPos + 2).trim();
     const leftVal = evalExpr(left, data, methods);
     const rightVal = evalExpr(right, data, methods);
-    return Math.pow(leftVal, rightVal);
+    return performArithmetic(leftVal, rightVal, '**');
   }
 
   // Check for method call: methodName(args)

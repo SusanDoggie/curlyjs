@@ -23,9 +23,30 @@
 //  THE SOFTWARE.
 //
 
+import Decimal from 'decimal.js';
 import type { ASTNode } from './ast';
 import type { TemplateData, TemplateMethods } from './types';
 import { evalExprNode } from './evaluator';
+
+// Helper to convert values to string with proper Decimal and BigInt handling
+function valueToString(value: any): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  // Handle Decimal instances
+  if (value instanceof Decimal) {
+    return value.toString();
+  }
+
+  // Handle BigInt
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  // For everything else, use standard String conversion
+  return String(value);
+}
 
 export function renderNode(node: ASTNode, data: TemplateData, methods: TemplateMethods): string {
   switch (node.type) {
@@ -34,7 +55,7 @@ export function renderNode(node: ASTNode, data: TemplateData, methods: TemplateM
       
     case 'interpolation':
       const value = evalExprNode(node.expression, data, methods);
-      return value !== null && value !== undefined ? String(value) : '';
+      return valueToString(value);
       
     case 'for':
       const array = evalExprNode(node.arrayExpr, data, methods);
