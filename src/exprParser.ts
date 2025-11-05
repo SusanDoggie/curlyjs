@@ -24,6 +24,7 @@
 //
 
 import type { ExprNode, LiteralNode, VariableNode, BinaryOpNode, UnaryOpNode, MethodCallNode, MemberAccessNode } from './ast';
+import { parseNumber } from './utils';
 
 // Operator precedence and associativity table
 // Higher precedence = evaluated first
@@ -53,7 +54,7 @@ export const OPERATORS: Record<string, { precedence: number; associativity: 'lef
 };
 
 type Token =
-  | { type: 'number'; value: number }
+  | { type: 'number'; value: number | bigint }
   | { type: 'string'; value: string }
   | { type: 'boolean'; value: boolean }
   | { type: 'variable'; name: string }
@@ -66,7 +67,7 @@ type Token =
   | { type: 'comma' }
   | { type: 'method'; name: string };
 
-function createLiteralNode(value: string | number | boolean | any[]): LiteralNode {
+function createLiteralNode(value: string | number | boolean | bigint | any[]): LiteralNode {
   return {
     type: 'literal',
     value
@@ -188,7 +189,7 @@ function tokenize(expr: string): Token[] {
         num += expr[i];
         i++;
       }
-      tokens.push({ type: 'number', value: parseFloat(num) });
+      tokens.push({ type: 'number', value: parseNumber(num) });
       continue;
     }
 
@@ -558,7 +559,7 @@ export function parseExpression(expr: string): ExprNode {
     return createLiteralNode(parseStringLiteral(expr));
   }
   if (!isNaN(Number(expr)) && expr !== '') {
-    return createLiteralNode(Number(expr));
+    return createLiteralNode(parseNumber(expr));
   }
   if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(expr)) {
     return createVariableNode(expr);

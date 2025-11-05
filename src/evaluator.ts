@@ -27,6 +27,7 @@ import _ from 'lodash';
 import Decimal from 'decimal.js';
 import type { TemplateData, TemplateMethods } from './types';
 import type { ExprNode } from './ast';
+import { parseNumber } from './utils';
 
 // Helper to check if a value is a Decimal instance
 function isDecimal(value: any): value is Decimal {
@@ -61,6 +62,27 @@ function performArithmetic(
     }
   }
 
+  // Handle BigInt arithmetic FIRST to preserve precision for large integers
+  if (typeof left === 'bigint' || typeof right === 'bigint') {
+    const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
+    const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+
+    switch (op) {
+      case '+':
+        return leftBigInt + rightBigInt;
+      case '-':
+        return leftBigInt - rightBigInt;
+      case '*':
+        return leftBigInt * rightBigInt;
+      case '/':
+        return leftBigInt / rightBigInt;
+      case '%':
+        return leftBigInt % rightBigInt;
+      case '**':
+        return leftBigInt ** rightBigInt;
+    }
+  }
+
   const leftDecimal = toDecimal(left);
   const rightDecimal = toDecimal(right);
 
@@ -79,27 +101,6 @@ function performArithmetic(
         return leftDecimal.modulo(rightDecimal);
       case '**':
         return leftDecimal.pow(rightDecimal);
-    }
-  }
-
-  // Handle BigInt arithmetic
-  if (typeof left === 'bigint' || typeof right === 'bigint') {
-    const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
-    const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
-
-    switch (op) {
-      case '+':
-        return leftBigInt + rightBigInt;
-      case '-':
-        return leftBigInt - rightBigInt;
-      case '*':
-        return leftBigInt * rightBigInt;
-      case '/':
-        return leftBigInt / rightBigInt;
-      case '%':
-        return leftBigInt % rightBigInt;
-      case '**':
-        return leftBigInt ** rightBigInt;
     }
   }
 
@@ -404,8 +405,8 @@ export function evalArg(arg: string, data: TemplateData, methods: TemplateMethod
   if (arg === 'true') return true;
   if (arg === 'false') return false;
   
-  // Number
-  if (!isNaN(Number(arg)) && arg !== '') return Number(arg);
+  // Number (use intelligent parsing for large integers)
+  if (!isNaN(Number(arg)) && arg !== '') return parseNumber(arg);
   
   // Nested method call or data path
   return evalExpr(arg, data, methods);
@@ -757,9 +758,9 @@ export function evalExpr(expr: string, data: TemplateData, methods: TemplateMeth
     if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
       return evalArg(expr, data, methods);
     }
-    // Check for number literal
+    // Check for number literal (use intelligent parsing for large integers)
     if (!isNaN(Number(expr)) && expr !== '') {
-      return Number(expr);
+      return parseNumber(expr);
     }
     // Check for boolean literal
     if (expr === 'true') return true;
