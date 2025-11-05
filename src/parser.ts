@@ -23,7 +23,7 @@
 //  THE SOFTWARE.
 //
 
-import type { ASTNode, TextNode, InterpolationNode, ForLoopNode, IfNode, IfBranch, ExprNode } from './ast';
+import type { ASTNode, TextNode, InterpolationNode, ForLoopNode, IfNode, IfBranch, CommentNode, ExprNode } from './ast';
 import { parseExpression } from './exprParser';
 
 function createTextNode(text: string): TextNode {
@@ -37,6 +37,13 @@ function createInterpolationNode(expression: string): InterpolationNode {
   return {
     type: 'interpolation',
     expression: parseExpression(expression)
+  };
+}
+
+function createCommentNode(text: string): CommentNode {
+  return {
+    type: 'comment',
+    text
   };
 }
 
@@ -210,30 +217,33 @@ export function parseTemplate(template: string): ASTNode[] {
   let pos = 0;
 
   while (pos < template.length) {
-    // Look for next tag (either {{ or {% )
+    // Look for next tag (either {{ or {% or {# )
     const nextExprTag = template.indexOf('{{', pos);
     const nextStmtTag = template.indexOf('{%', pos);
+    const nextCommentTag = template.indexOf('{#', pos);
     
     let nextTag = -1;
-    let isStatement = false;
+    let tagType: 'expr' | 'stmt' | 'comment' = 'expr';
     let tagEnd = -1;
     
-    if (nextExprTag === -1 && nextStmtTag === -1) {
+    // Find which tag comes first
+    const tags = [
+      { pos: nextExprTag, type: 'expr' as const, close: '}}' },
+      { pos: nextStmtTag, type: 'stmt' as const, close: '%}' },
+      { pos: nextCommentTag, type: 'comment' as const, close: '#}' }
+    ].filter(t => t.pos !== -1).sort((a, b) => a.pos - b.pos);
+
+    if (tags.length === 0) {
       // No more tags, add remaining text
       if (pos < template.length) {
         nodes.push(createTextNode(template.slice(pos)));
       }
       break;
-    } else if (nextExprTag === -1) {
-      nextTag = nextStmtTag;
-      isStatement = true;
-    } else if (nextStmtTag === -1) {
-      nextTag = nextExprTag;
-      isStatement = false;
-    } else {
-      nextTag = Math.min(nextExprTag, nextStmtTag);
-      isStatement = nextTag === nextStmtTag;
     }
+
+    nextTag = tags[0].pos;
+    tagType = tags[0].type;
+    const closeTag = tags[0].close;
 
     // Add text before the tag
     if (nextTag > pos) {
@@ -241,7 +251,6 @@ export function parseTemplate(template: string): ASTNode[] {
     }
 
     // Find the closing tag
-    const closeTag = isStatement ? '%}' : '}}';
     tagEnd = template.indexOf(closeTag, nextTag);
     if (tagEnd === -1) {
       throw new Error(`Unclosed tag at position ${nextTag}`);
@@ -249,8 +258,15 @@ export function parseTemplate(template: string): ASTNode[] {
 
     const tagContent = template.slice(nextTag + 2, tagEnd).trim();
 
+    // Handle comment tags - just skip them
+    if (tagType === 'comment') {
+      nodes.push(createCommentNode(tagContent));
+      pos = tagEnd + 2;
+      continue;
+    }
+
     // Check what type of tag this is
-    if (isStatement && tagContent.startsWith('for ')) {
+    if (tagType === 'stmt' && tagContent.startsWith('for ')) {
       // Parse for loop - allow complex expressions after 'in'
       const forMatch = tagContent.match(/^for\s+(\w+)(?:\s*,\s*(\w+))?\s+in\s+(.+)$/);
       if (!forMatch) {
@@ -272,7 +288,7 @@ export function parseTemplate(template: string): ASTNode[] {
       
       // Skip past the endfor tag
       pos = template.indexOf('%}', endForTag) + 2;
-    } else if (isStatement && tagContent.startsWith('if ')) {
+    } else if (tagType === 'stmt' && tagContent.startsWith('if ')) {
       // Parse if/elif/else block
       const ifMatch = tagContent.match(/^if\s+(.+)$/);
       if (!ifMatch) {
@@ -282,10 +298,10 @@ export function parseTemplate(template: string): ASTNode[] {
       const { branches, elseBody, endPos } = parseIfBlock(template, nextTag, tagEnd);
       nodes.push(createIfNode(branches, elseBody));
       pos = endPos;
-    } else if (isStatement && (tagContent === 'endfor' || tagContent === 'endif' || tagContent === 'else' || tagContent.startsWith('elif '))) {
+    } else if (tagType === 'stmt' && (tagContent === 'endfor' || tagContent === 'endif' || tagContent === 'else' || tagContent.startsWith('elif '))) {
       // These should be handled by their parent structures
       throw new Error('Unexpected tag: ' + tagContent);
-    } else if (!isStatement) {
+    } else if (tagType === 'expr') {
       // Regular interpolation (only in {{ }} tags)
       nodes.push(createInterpolationNode(tagContent));
       pos = tagEnd + 2;

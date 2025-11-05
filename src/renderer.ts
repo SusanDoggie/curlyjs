@@ -60,6 +60,10 @@ export function renderNode(node: ASTNode, data: TemplateData, methods: TemplateM
       }
       return '';
       
+    case 'comment':
+      // Comments should not be rendered
+      return '';
+
     default:
       return '';
   }

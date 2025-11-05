@@ -93,4 +93,9 @@ export interface IfNode extends BaseNode {
   elseBody: ASTNode[] | null;
 }
 
-export type ASTNode = TextNode | InterpolationNode | ForLoopNode | IfNode;
+export interface CommentNode extends BaseNode {
+  type: 'comment';
+  text: string;
+}
+
+export type ASTNode = TextNode | InterpolationNode | ForLoopNode | IfNode | CommentNode;
