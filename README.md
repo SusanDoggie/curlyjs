@@ -9,7 +9,8 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 - 🚀 **Lightweight** - Minimal dependencies, small bundle size
 - 🎯 **Simple Syntax** - Clean, readable Jinja2-inspired template syntax
 - 🔄 **Control Flow** - Full support for conditionals (`if/elif/else`) and loops (`for`)
-- 📊 **Operators** - Comparison, logical, and arithmetic operators
+- � **Comments** - Template comments with `{# ... #}` syntax
+- �📊 **Operators** - Comparison, logical, and arithmetic operators
 - 🔧 **Custom Methods** - Extend templates with custom functions and method calls in loops
 - 🌳 **Nested Structures** - Support for deeply nested objects and arrays
 - 📝 **Variable & Method Extraction** - Automatically detect variables and methods used in templates
@@ -219,6 +220,54 @@ Use parentheses to override precedence:
 
 ```typescript
 const t = new Template('{% if (a || b) && c %}Result{% endif %}');
+```
+
+### Comments
+
+Add comments to your templates using `{# ... #}` syntax. Comments are completely ignored during rendering:
+
+```typescript
+const t = new Template('Hello {# this is a comment #} World!');
+t.render({}); // "Hello  World!"
+```
+
+#### Multiline Comments
+
+Comments can span multiple lines:
+
+```typescript
+const t = new Template(`
+  {# 
+    This is a multiline comment
+    that will be completely ignored
+  #}
+  Content here
+`);
+t.render({}); // "\n  \n  Content here\n"
+```
+
+#### Comments in Templates
+
+Use comments to document your templates or temporarily disable sections:
+
+```typescript
+const t = new Template(`
+  {# User information section #}
+  <h1>{{ user.name }}</h1>
+  
+  {# Loop through posts #}
+  {% for post in posts %}
+    {# Each post item #}
+    <article>{{ post.title }}</article>
+  {% endfor %}
+`);
+```
+
+**Note:** Comments can contain any text, including template-like syntax, and will not be processed:
+
+```typescript
+const t = new Template('{# {{ this.wont.be.evaluated }} #}text');
+t.render({}); // "text"
 ```
 
 ### Custom Methods
@@ -495,6 +544,14 @@ curlyjs parses templates into an Abstract Syntax Tree (AST) for efficient render
 interface IfBranch {
   condition: string,
   body: ASTNode[]
+}
+```
+
+#### `CommentNode`
+```typescript
+{
+  type: 'comment',
+  text: string
 }
 ```
 
