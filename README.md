@@ -9,7 +9,8 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 - 🚀 **Lightweight** - Minimal dependencies, small bundle size
 - 🎯 **Simple Syntax** - Clean, readable Jinja2-inspired template syntax
 - 🔄 **Control Flow** - Full support for conditionals (`if/elif/else`) and loops (`for`)
-- 💬 **Comments** - Template comments with `{# ... #}` syntax
+- � **Array Indexing** - Access array elements with bracket notation using literal or variable indices (`items[0]`, `items[index]`)
+- �💬 **Comments** - Template comments with `{# ... #}` syntax
 - 📊 **Operators** - Rich operator support including arithmetic (`+`, `-`, `*`, `/`, `%`, `**`), comparison, logical (`&&`, `||`, `!`), and bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`, `>>>`)
 - 🔧 **Custom Methods** - Extend templates with custom functions and method calls in loops
 - 🌳 **Nested Structures** - Support for deeply nested objects and arrays
@@ -62,6 +63,57 @@ t.render({
     } 
   } 
 }); // "City: NYC"
+```
+
+#### Array Indexing
+
+Access array elements using bracket notation with literal or variable indices:
+
+```typescript
+// Literal numeric index
+const t1 = new Template('First: {{ items[0] }}, Second: {{ items[1] }}');
+t1.render({ items: ['apple', 'banana', 'cherry'] }); 
+// "First: apple, Second: banana"
+
+// Variable index
+const t2 = new Template('Item at index: {{ items[idx] }}');
+t2.render({ items: ['x', 'y', 'z'], idx: 2 }); 
+// "Item at index: z"
+
+// Nested array access
+const t3 = new Template('{{ users[0].name }}');
+t3.render({ users: [{ name: 'Alice' }, { name: 'Bob' }] }); 
+// "Alice"
+
+// Multi-dimensional arrays
+const t4 = new Template('{{ matrix[1][2] }}');
+t4.render({ matrix: [[1, 2, 3], [4, 5, 6]] }); 
+// "6"
+```
+
+Array indexing works in all contexts:
+
+```typescript
+// In conditionals
+const t5 = new Template('{% if items[0] == "apple" %}Found apple{% endif %}');
+t5.render({ items: ['apple', 'banana'] }); 
+// "Found apple"
+
+// In method calls
+const t6 = new Template('{{ upper(items[0]) }}');
+const methods = { upper: (s) => s.toUpperCase() };
+t6.render({ items: ['hello', 'world'] }, methods); 
+// "HELLO"
+
+// In loops
+const t7 = new Template('{% for user in users %}{{ user.tags[0] }}, {% endfor %}');
+t7.render({ 
+  users: [
+    { tags: ['admin', 'user'] }, 
+    { tags: ['guest', 'viewer'] }
+  ] 
+}); 
+// "admin, guest, "
 ```
 
 #### Handling Missing Values
@@ -650,7 +702,21 @@ const template = new Template(`
       <span class="badge">Premium Member</span>
     {% endif %}
     
-    <h2>Orders</h2>
+    <h2>Recent Order</h2>
+    {% if !isEmpty(user.orders) %}
+      {# Show the most recent order (first in array) #}
+      <div class="recent-order">
+        <strong>{{ user.orders[0].product }}</strong>
+        - {{ formatPrice(user.orders[0].price) }}
+        {% if user.orders[0].shipped %}
+          <span class="status">✓ Shipped</span>
+        {% else %}
+          <span class="status">⏳ Processing</span>
+        {% endif %}
+      </div>
+    {% endif %}
+    
+    <h2>All Orders</h2>
     {% if !isEmpty(user.orders) %}
       <ul>
         {% for order, index in user.orders %}
@@ -695,7 +761,7 @@ console.log('Methods:', template.methods);
 
 curlyjs parses templates into an Abstract Syntax Tree (AST) for efficient rendering. The AST consists of the following node types:
 
-### Node Types
+### Template Node Types
 
 #### `TextNode`
 ```typescript
@@ -709,7 +775,7 @@ curlyjs parses templates into an Abstract Syntax Tree (AST) for efficient render
 ```typescript
 {
   type: 'interpolation',
-  expression: string
+  expression: ExprNode
 }
 ```
 
@@ -719,7 +785,7 @@ curlyjs parses templates into an Abstract Syntax Tree (AST) for efficient render
   type: 'for',
   itemVar: string,
   indexVar: string | null,
-  arrayVar: string,
+  arrayExpr: ExprNode,
   body: ASTNode[]
 }
 ```
@@ -733,7 +799,7 @@ curlyjs parses templates into an Abstract Syntax Tree (AST) for efficient render
 }
 
 interface IfBranch {
-  condition: string,
+  condition: ExprNode,
   body: ASTNode[]
 }
 ```
@@ -743,6 +809,66 @@ interface IfBranch {
 {
   type: 'comment',
   text: string
+}
+```
+
+### Expression Node Types
+
+Expressions within templates are parsed into their own AST structure:
+
+#### `LiteralNode`
+```typescript
+{
+  type: 'literal',
+  value: string | number | boolean | any[]
+}
+```
+
+#### `VariableNode`
+```typescript
+{
+  type: 'variable',
+  name: string
+}
+```
+
+#### `MemberAccessNode`
+```typescript
+{
+  type: 'memberAccess',
+  object: ExprNode,
+  property: ExprNode
+}
+```
+Represents array/object member access using bracket notation (e.g., `items[0]`, `users[index]`).
+
+#### `BinaryOpNode`
+```typescript
+{
+  type: 'binaryOp',
+  operator: '||' | '&&' | '==' | '!=' | '>' | '<' | '>=' | '<=' | 
+            '+' | '-' | '*' | '/' | '%' | '**' | 
+            '&' | '|' | '^' | '<<' | '>>' | '>>>',
+  left: ExprNode,
+  right: ExprNode
+}
+```
+
+#### `UnaryOpNode`
+```typescript
+{
+  type: 'unaryOp',
+  operator: '!' | '~',
+  operand: ExprNode
+}
+```
+
+#### `MethodCallNode`
+```typescript
+{
+  type: 'methodCall',
+  methodName: string,
+  args: ExprNode[]
 }
 ```
 
