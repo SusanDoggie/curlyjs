@@ -40,6 +40,8 @@ function reconstructExpression(expr: ExprNode): string {
       return String(expr.value);
     case 'variable':
       return expr.name;
+    case 'memberAccess':
+      return `${reconstructExpression(expr.object)}[${reconstructExpression(expr.property)}]`;
     case 'binaryOp':
       return `${reconstructExpression(expr.left)} ${expr.operator} ${reconstructExpression(expr.right)}`;
     case 'unaryOp':

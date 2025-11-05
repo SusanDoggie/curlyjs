@@ -23,7 +23,7 @@
 //  THE SOFTWARE.
 //
 
-import type { ExprNode, LiteralNode, VariableNode, BinaryOpNode, UnaryOpNode, MethodCallNode } from './ast';
+import type { ExprNode, LiteralNode, VariableNode, BinaryOpNode, UnaryOpNode, MethodCallNode, MemberAccessNode } from './ast';
 
 // Operator precedence and associativity table
 // Higher precedence = evaluated first
@@ -108,6 +108,14 @@ function createMethodCallNode(methodName: string, args: ExprNode[]): MethodCallN
     type: 'methodCall',
     methodName,
     args
+  };
+}
+
+function createMemberAccessNode(object: ExprNode, property: ExprNode): MemberAccessNode {
+  return {
+    type: 'memberAccess',
+    object,
+    property
   };
 }
 
@@ -389,9 +397,30 @@ function infixToPostfix(tokens: Token[]): Token[] {
       }
     }
     else if (token.type === 'lbracket') {
-      operatorStack.push(token);
-      // Start tracking elements for this array
-      argCountStack.push({ commaCount: 0, hasArgs: false, isArray: true });
+      // Check if this is member access (bracket after an expression) or array literal
+      // Member access: output has something that `[` could be indexing
+      // Array literal: `[` appears at the start of an expression context
+
+      // Check if we just pushed something to output that could be indexed
+      const hasValueInOutput = output.length > 0;
+      const lastStackToken = operatorStack.length > 0 ? operatorStack[operatorStack.length - 1] : null;
+
+      // Member access if there's a value in output and we're not right after comma or opening bracket
+      const isMemberAccess = hasValueInOutput && !(
+        lastStackToken?.type === 'comma' ||
+        (lastStackToken?.type === 'lbracket' && argCountStack.length > 0 && !argCountStack[argCountStack.length - 1].hasArgs)
+      );
+
+      if (isMemberAccess) {
+        // This is member access like items[0]
+        // Push a special marker to track this
+        operatorStack.push({ type: 'lbracket', isMemberAccess: true } as any);
+        argCountStack.push({ commaCount: 0, hasArgs: false, isArray: false });
+      } else {
+      // This is an array literal like [1, 2, 3]
+        operatorStack.push(token);
+        argCountStack.push({ commaCount: 0, hasArgs: false, isArray: true });
+      }
     }
     else if (token.type === 'rbracket') {
       // Pop operators until we find a left bracket
@@ -401,17 +430,27 @@ function infixToPostfix(tokens: Token[]): Token[] {
       if (operatorStack.length === 0) {
         throw new Error('Mismatched brackets');
       }
-      operatorStack.pop(); // Remove the left bracket
 
-      // Get element count and create array marker
+      const lbracket = operatorStack.pop()!;
       const argInfo = argCountStack.pop();
-      const elementCount = argInfo && argInfo.hasArgs ? argInfo.commaCount + 1 : 0;
-      // Push array marker with element count
-      output.push({ type: 'operator', operator: '[]', argCount: elementCount } as any);
 
-      // If we just completed an array and we're still inside a method or another array, mark hasArgs
-      if (argCountStack.length > 0) {
-        argCountStack[argCountStack.length - 1].hasArgs = true;
+      // Check if this was member access or array literal
+      if ((lbracket as any).isMemberAccess) {
+        // Member access: push a special operator for member access
+        // The index should be a single expression
+        output.push({ type: 'operator', operator: '[]access' } as any);
+
+        if (argCountStack.length > 0) {
+          argCountStack[argCountStack.length - 1].hasArgs = true;
+        }
+      } else {
+      // Array literal
+        const elementCount = argInfo && argInfo.hasArgs ? argInfo.commaCount + 1 : 0;
+        output.push({ type: 'operator', operator: '[]', argCount: elementCount } as any);
+
+        if (argCountStack.length > 0) {
+          argCountStack[argCountStack.length - 1].hasArgs = true;
+        }
       }
     }
   }
@@ -464,6 +503,15 @@ function buildASTFromPostfix(postfix: Token[]): ExprNode {
         continue;
       }
       
+      if (token.operator === '[]access') {
+        // Member access: pop index and object
+        const property = stack.pop();
+        const object = stack.pop();
+        if (!object || !property) throw new Error('Invalid expression: missing operands for member access');
+        stack.push(createMemberAccessNode(object, property));
+        continue;
+      }
+
       const right = stack.pop();
       const left = stack.pop();
       if (!left || !right) throw new Error('Invalid expression: missing operands');

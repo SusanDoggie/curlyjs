@@ -57,7 +57,13 @@ export interface MethodCallNode extends BaseExprNode {
   args: ExprNode[];
 }
 
-export type ExprNode = LiteralNode | VariableNode | BinaryOpNode | UnaryOpNode | MethodCallNode;
+export interface MemberAccessNode extends BaseExprNode {
+  type: 'memberAccess';
+  object: ExprNode;
+  property: ExprNode;
+}
+
+export type ExprNode = LiteralNode | VariableNode | BinaryOpNode | UnaryOpNode | MethodCallNode | MemberAccessNode;
 
 // Template AST Node types
 export interface BaseNode {

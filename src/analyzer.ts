@@ -47,6 +47,12 @@ export function extractFromExprNode(node: ExprNode, variables: Set<string>, loop
       }
       break;
 
+    case 'memberAccess':
+      // Extract variables from both object and property expressions
+      extractFromExprNode(node.object, variables, loopVars);
+      extractFromExprNode(node.property, variables, loopVars);
+      break;
+
     case 'binaryOp':
       extractFromExprNode(node.left, variables, loopVars);
       extractFromExprNode(node.right, variables, loopVars);
@@ -80,6 +86,12 @@ export function extractMethodsFromExprNode(node: ExprNode, methods: Set<string>)
 
     case 'variable':
       // No methods in variable nodes
+      break;
+
+    case 'memberAccess':
+      // Extract methods from both object and property expressions
+      extractMethodsFromExprNode(node.object, methods);
+      extractMethodsFromExprNode(node.property, methods);
       break;
 
     case 'binaryOp':

@@ -47,6 +47,17 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
       const value = _.get(data, node.name);
       return !_.isNil(value) ? value : '';
 
+    case 'memberAccess':
+      const obj = evalExprNode(node.object, data, methods);
+      const prop = evalExprNode(node.property, data, methods);
+
+      // Handle array/object access
+      if (_.isNil(obj)) return '';
+
+      // Use lodash get for safe access
+      const result = _.get(obj, prop);
+      return !_.isNil(result) ? result : '';
+
     case 'binaryOp':
       const leftVal = evalExprNode(node.left, data, methods);
       const rightVal = evalExprNode(node.right, data, methods);
