@@ -29,7 +29,7 @@ import type { ExprNode, LiteralNode, VariableNode, BinaryOpNode, UnaryOpNode, Me
 // Higher precedence = evaluated first
 // Left associative: operators of same precedence evaluate left-to-right
 // Right associative: operators of same precedence evaluate right-to-left
-const OPERATORS: Record<string, { precedence: number; associativity: 'left' | 'right' }> = {
+export const OPERATORS: Record<string, { precedence: number; associativity: 'left' | 'right' }> = {
   '||': { precedence: 1, associativity: 'left' },
   '&&': { precedence: 2, associativity: 'left' },
   '|': { precedence: 3, associativity: 'left' },

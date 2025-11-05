@@ -28,6 +28,7 @@ import type { TemplateData, TemplateMethods } from './types';
 import { parseTemplate } from './parser';
 import { extractVariables, extractMethods } from './analyzer';
 import { renderNodes } from './renderer';
+import { OPERATORS } from './exprParser';
 
 function reconstructExpression(expr: ExprNode): string {
   switch (expr.type) {
@@ -54,17 +55,7 @@ function reconstructExpression(expr: ExprNode): string {
       return `${reconstructExpression(expr.object)}[${reconstructExpression(expr.property)}]`;
     case 'binaryOp': {
       // Add parentheses around operands if they are binary operations with lower precedence
-      const OPERATOR_PRECEDENCE: Record<string, number> = {
-        '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5,
-        '==': 6, '!=': 6,
-        '<': 7, '>': 7, '<=': 7, '>=': 7,
-        '<<': 8, '>>': 8, '>>>': 8,
-        '+': 9, '-': 9,
-        '*': 10, '/': 10, '%': 10,
-        '**': 11
-      };
-
-      const currentPrecedence = OPERATOR_PRECEDENCE[expr.operator] || 0;
+      const currentPrecedence = OPERATORS[expr.operator]?.precedence || 0;
 
       const leftExpr = expr.left;
       const rightExpr = expr.right;
@@ -72,7 +63,7 @@ function reconstructExpression(expr: ExprNode): string {
       // Add parentheses to left operand if it has lower precedence
       let leftStr = reconstructExpression(leftExpr);
       if (leftExpr.type === 'binaryOp') {
-        const leftPrecedence = OPERATOR_PRECEDENCE[leftExpr.operator] || 0;
+        const leftPrecedence = OPERATORS[leftExpr.operator]?.precedence || 0;
         if (leftPrecedence < currentPrecedence) {
           leftStr = `(${leftStr})`;
         }
@@ -82,9 +73,9 @@ function reconstructExpression(expr: ExprNode): string {
       // (equal precedence on right needs parens for left-associative operators)
       let rightStr = reconstructExpression(rightExpr);
       if (rightExpr.type === 'binaryOp') {
-        const rightPrecedence = OPERATOR_PRECEDENCE[rightExpr.operator] || 0;
+        const rightPrecedence = OPERATORS[rightExpr.operator]?.precedence || 0;
         // For right-associative operators like **, we need different rules
-        const isRightAssociative = expr.operator === '**';
+        const isRightAssociative = OPERATORS[expr.operator]?.associativity === 'right';
         if (isRightAssociative) {
           if (rightPrecedence < currentPrecedence) {
             rightStr = `(${rightStr})`;
