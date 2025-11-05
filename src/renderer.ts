@@ -36,7 +36,19 @@ function valueToString(value: any): string {
 
   // Handle Decimal instances
   if (value instanceof Decimal) {
-    return value.toString();
+    // Use toFixed() for integer-like Decimals to avoid scientific notation
+    // For non-integers, use toString() which respects Decimal.js precision settings
+    if (value.isInt()) {
+      return value.toFixed(0);
+    }
+    // For decimals, check if we need toFixed to avoid scientific notation
+    const str = value.toString();
+    if (str.includes('e')) {
+      // Has scientific notation, use toFixed with appropriate decimal places
+      const decimalPlaces = value.decimalPlaces();
+      return value.toFixed(decimalPlaces);
+    }
+    return str;
   }
 
   // Handle BigInt

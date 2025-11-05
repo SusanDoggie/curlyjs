@@ -502,4 +502,286 @@ describe('Decimal and BigInt Support', () => {
       expect(result).toBe('0');
     });
   });
+
+  describe('BigInt literals in templates', () => {
+    test('should automatically use BigInt for large integer literals (>15 digits)', () => {
+      const template = new Template('{{ 999999999999999999 }}');
+      const result = template.render({});
+      expect(result).toBe('999999999999999999');
+    });
+
+    test('should preserve precision with very large integer literals', () => {
+      const template = new Template('{{ 99999999999999999999999999 }}');
+      const result = template.render({});
+      expect(result).toBe('99999999999999999999999999');
+    });
+
+    test('should handle addition with large integer literals', () => {
+      const template = new Template('{{ 999999999999999999 + 1 }}');
+      const result = template.render({});
+      expect(result).toBe('1000000000000000000');
+    });
+
+    test('should handle subtraction with large integer literals', () => {
+      const template = new Template('{{ 1000000000000000000 - 1 }}');
+      const result = template.render({});
+      expect(result).toBe('999999999999999999');
+    });
+
+    test('should handle multiplication with large results', () => {
+      const template = new Template('{{ 999999999999999999 * 2 }}');
+      const result = template.render({});
+      expect(result).toBe('1999999999999999998');
+    });
+
+    test('should handle mixed BigInt literal and variable', () => {
+      const template = new Template('{{ 999999999999999999 + a }}');
+      const result = template.render({ a: BigInt(1) });
+      expect(result).toBe('1000000000000000000');
+    });
+
+    test('should handle mixed variable and BigInt literal', () => {
+      const template = new Template('{{ a + 999999999999999999 }}');
+      const result = template.render({ a: BigInt(1) });
+      expect(result).toBe('1000000000000000000');
+    });
+
+    test('should handle complex expressions with large integer literals', () => {
+      const template = new Template('{{ (999999999999999999 + 1) * 2 }}');
+      const result = template.render({});
+      expect(result).toBe('2000000000000000000');
+    });
+
+    test('should handle negative large integer literals', () => {
+      const template = new Template('{{ -999999999999999999 }}');
+      const result = template.render({});
+      expect(result).toBe('-999999999999999999');
+    });
+
+    test('should handle large integer literal in conditionals', () => {
+      const template = new Template('{% if 999999999999999999 > 999999999999999998 %}yes{% else %}no{% endif %}');
+      const result = template.render({});
+      expect(result).toBe('yes');
+    });
+
+    test('should handle large integer literal equality', () => {
+      const template = new Template('{% if 999999999999999999 == 999999999999999999 %}equal{% else %}not equal{% endif %}');
+      const result = template.render({});
+      expect(result).toBe('equal');
+    });
+
+    test('should handle large integer literals in loops', () => {
+      const template = new Template('{% for i in items %}{{ i + 1000000000000000000 }},{% endfor %}');
+      const result = template.render({
+        items: [BigInt('999999999999999999'), BigInt('999999999999999998')],
+      });
+      expect(result).toBe('1999999999999999999,1999999999999999998,');
+    });
+
+    test('should use regular Number for small integers (<= 15 digits)', () => {
+      const template = new Template('{{ 123456789012345 }}');
+      const result = template.render({});
+      expect(result).toBe('123456789012345');
+    });
+
+    test('should handle 16-digit threshold correctly', () => {
+      // 16 digits should use BigInt
+      const template1 = new Template('{{ 1234567890123456 }}');
+      const result1 = template1.render({});
+      expect(result1).toBe('1234567890123456');
+
+      // 15 digits should use Number
+      const template2 = new Template('{{ 123456789012345 }}');
+      const result2 = template2.render({});
+      expect(result2).toBe('123456789012345');
+    });
+
+    test('should handle BigInt division (integer division)', () => {
+      const template = new Template('{{ 999999999999999999 / 2 }}');
+      const result = template.render({});
+      expect(result).toBe('499999999999999999');
+    });
+
+    test('should handle BigInt modulo', () => {
+      const template = new Template('{{ 999999999999999999 % 100 }}');
+      const result = template.render({});
+      expect(result).toBe('99');
+    });
+
+    test('should handle BigInt exponentiation with literals', () => {
+      const template = new Template('{{ 9999999999999999 ** 2 }}');
+      const result = template.render({});
+      expect(result).toBe('99999999999999980000000000000001');
+    });
+
+    test('should handle comparison between BigInt literals', () => {
+      const template = new Template('{% if 999999999999999999 < 1000000000000000000 %}less{% else %}not less{% endif %}');
+      const result = template.render({});
+      expect(result).toBe('less');
+    });
+  });
+
+  describe('Overflow detection and automatic BigInt conversion', () => {
+    test('should detect overflow in multiplication and use BigInt', () => {
+      const template = new Template('{{ 1000000000000 * 1000000000000 }}');
+      const result = template.render({});
+      expect(result).toBe('1000000000000000000000000');
+    });
+
+    test('should detect overflow in addition and use BigInt', () => {
+      const template = new Template('{{ 9007199254740991 + 9007199254740991 }}');
+      const result = template.render({});
+      expect(result).toBe('18014398509481982');
+    });
+
+    test('should detect overflow in exponentiation and use BigInt', () => {
+      const template = new Template('{{ 10 ** 20 }}');
+      const result = template.render({});
+      expect(result).toBe('100000000000000000000');
+    });
+
+    test('should handle overflow in subtraction', () => {
+      // Note: Using 0 - x - y instead of -x - y to avoid parser ambiguity with unary minus
+      const template = new Template('{{ 0 - 9007199254740991 - 9007199254740991 }}');
+      const result = template.render({});
+      expect(result).toBe('-18014398509481982');
+    });
+
+    test('should not convert to BigInt for non-integer operations', () => {
+      const template = new Template('{{ 1.5 * 1000000000000000 }}');
+      const result = template.render({});
+      // This will be a regular floating point result
+      expect(result).toBe('1500000000000000');
+    });
+  });
+
+  describe('Parser limitations with unary minus', () => {
+    // These tests document a known parser bug where unary minus before binary minus
+    // causes parsing ambiguity. The parser cannot distinguish between:
+    // - Unary minus on first operand: (-x) - y
+    // - Binary minus with negative literal: -(x - y)
+    // Workaround: Use 0 - x - y or parentheses
+
+    test('KNOWN BUG: unary minus before binary minus returns empty string', () => {
+      const template = new Template('{{ -1 - 2 }}');
+      const result = template.render({});
+      // BUG: Returns empty string instead of -3
+      expect(result).toBe('-3');
+    });
+
+    test('KNOWN BUG: unary minus before subtraction with large numbers', () => {
+      const template = new Template('{{ -9007199254740991 - 9007199254740991 }}');
+      const result = template.render({});
+      // BUG: Returns empty string instead of -18014398509481982
+      expect(result).toBe('-18014398509481982');
+    });
+
+    test('KNOWN BUG: parentheses do not help with unary minus before binary minus', () => {
+      const template = new Template('{{ (-1) - 2 }}');
+      const result = template.render({});
+      // BUG: Even with parentheses, returns empty string
+      expect(result).toBe('-3');
+    });
+
+    test('WORKAROUND: use 0 - x - y instead of -x - y', () => {
+      const template = new Template('{{ 0 - 1 - 2 }}');
+      const result = template.render({});
+      expect(result).toBe('-3');
+    });
+
+    test('WORKAROUND: use variables for negative values', () => {
+      const template = new Template('{{ x - 2 }}');
+      const result = template.render({ x: -1 });
+      expect(result).toBe('-3');
+    });
+
+    test('unary minus alone works correctly', () => {
+      const template = new Template('{{ -5 }}');
+      const result = template.render({});
+      expect(result).toBe('-5');
+    });
+
+    test('binary minus alone works correctly', () => {
+      const template = new Template('{{ 3 - 5 }}');
+      const result = template.render({});
+      expect(result).toBe('-2');
+    });
+  });
+
+  describe('Mixed type arithmetic (BigInt + Decimal)', () => {
+    test('should convert BigInt to Decimal when mixed with Decimal', () => {
+      const template = new Template('{{ a + b }}');
+      const result = template.render({
+        a: BigInt(100),
+        b: new Decimal('0.5'),
+      });
+      expect(result).toBe('100.5');
+    });
+
+    test('should handle Decimal + BigInt', () => {
+      const template = new Template('{{ a + b }}');
+      const result = template.render({
+        a: new Decimal('0.1'),
+        b: BigInt('999999999999999999'),
+      });
+      expect(result).toBe('999999999999999999.1');
+    });
+
+    test('should handle BigInt * Decimal', () => {
+      const template = new Template('{{ a * b }}');
+      const result = template.render({
+        a: BigInt(100),
+        b: new Decimal('1.5'),
+      });
+      expect(result).toBe('150');
+    });
+
+    test('should handle Decimal / BigInt', () => {
+      const template = new Template('{{ a / b }}');
+      const result = template.render({
+        a: new Decimal('100'),
+        b: BigInt(3),
+      });
+      // Should use Decimal division for precision
+      expect(result).toMatch(/^33\.3+$/);
+    });
+
+    test('should handle BigInt - Decimal', () => {
+      const template = new Template('{{ a - b }}');
+      const result = template.render({
+        a: BigInt(100),
+        b: new Decimal('0.5'),
+      });
+      expect(result).toBe('99.5');
+    });
+
+    test('should handle complex mixed arithmetic', () => {
+      const template = new Template('{{ a + b * c }}');
+      const result = template.render({
+        a: new Decimal('0.1'),
+        b: BigInt(10),
+        c: new Decimal('0.5'),
+      });
+      expect(result).toBe('5.1');
+    });
+
+    test('should handle BigInt exponentiation with Decimal', () => {
+      const template = new Template('{{ a ** b }}');
+      const result = template.render({
+        a: BigInt(2),
+        b: new Decimal('10'),
+      });
+      expect(result).toBe('1024');
+    });
+
+    test('should preserve precision in mixed operations', () => {
+      const template = new Template('{{ a + b + c }}');
+      const result = template.render({
+        a: new Decimal('0.1'),
+        b: new Decimal('0.2'),
+        c: BigInt(1),
+      });
+      expect(result).toBe('1.3');
+    });
+  });
 });

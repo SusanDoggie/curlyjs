@@ -62,24 +62,56 @@ function performArithmetic(
     }
   }
 
-  // Handle BigInt arithmetic FIRST to preserve precision for large integers
-  if (typeof left === 'bigint' || typeof right === 'bigint') {
-    const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
-    const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+  // Handle mixed BigInt and Decimal: convert to Decimal for precision
+  // Check if one operand is BigInt and the other is Decimal or a non-integer Number
+  if ((typeof left === 'bigint' || typeof right === 'bigint') &&
+    (isDecimal(left) || isDecimal(right) ||
+      (typeof left === 'number' && !Number.isInteger(left)) ||
+      (typeof right === 'number' && !Number.isInteger(right)))) {
+    const leftDecimal = isDecimal(left) ? left : new Decimal(left.toString());
+    const rightDecimal = isDecimal(right) ? right : new Decimal(right.toString());
 
     switch (op) {
       case '+':
-        return leftBigInt + rightBigInt;
+        return leftDecimal.plus(rightDecimal);
       case '-':
-        return leftBigInt - rightBigInt;
+        return leftDecimal.minus(rightDecimal);
       case '*':
-        return leftBigInt * rightBigInt;
+        return leftDecimal.times(rightDecimal);
       case '/':
-        return leftBigInt / rightBigInt;
+        return leftDecimal.dividedBy(rightDecimal);
       case '%':
-        return leftBigInt % rightBigInt;
+        return leftDecimal.modulo(rightDecimal);
       case '**':
-        return leftBigInt ** rightBigInt;
+        return leftDecimal.pow(rightDecimal);
+    }
+  }
+
+  // Handle BigInt arithmetic to preserve precision for large integers
+  // Only if both operands are integers (BigInt or integer Numbers)
+  if (typeof left === 'bigint' || typeof right === 'bigint') {
+    // Check if both are integers before converting to BigInt
+    const leftIsInt = typeof left === 'bigint' || Number.isInteger(left);
+    const rightIsInt = typeof right === 'bigint' || Number.isInteger(right);
+
+    if (leftIsInt && rightIsInt) {
+      const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
+      const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+
+      switch (op) {
+        case '+':
+          return leftBigInt + rightBigInt;
+        case '-':
+          return leftBigInt - rightBigInt;
+        case '*':
+          return leftBigInt * rightBigInt;
+        case '/':
+          return leftBigInt / rightBigInt;
+        case '%':
+          return leftBigInt % rightBigInt;
+        case '**':
+          return leftBigInt ** rightBigInt;
+      }
     }
   }
 
@@ -104,21 +136,87 @@ function performArithmetic(
     }
   }
 
-  // Fall back to regular JavaScript arithmetic
+  // Pre-emptive BigInt check for operations likely to overflow
+  // If both operands are integers and large enough that multiplication might overflow
+  if (Number.isInteger(left) && Number.isInteger(right)) {
+    const absLeft = Math.abs(left);
+    const absRight = Math.abs(right);
+
+    // Check if multiplication or exponentiation might overflow
+    // Use BigInt if operands are large enough
+    if ((op === '*' && absLeft > 1000000 && absRight > 1000000) ||
+      (op === '**' && absLeft > 1000 && absRight > 2)) {
+      try {
+        const leftBigInt = BigInt(left);
+        const rightBigInt = BigInt(right);
+
+        switch (op) {
+          case '*':
+            return leftBigInt * rightBigInt;
+          case '**':
+            return leftBigInt ** rightBigInt;
+        }
+      } catch {
+        // Fall through to regular arithmetic
+      }
+    }
+  }
+
+  // Fall back to regular JavaScript arithmetic with overflow detection
+  let result: number;
   switch (op) {
     case '+':
-      return left + right;
+      result = left + right;
+      break;
     case '-':
-      return left - right;
+      result = left - right;
+      break;
     case '*':
-      return left * right;
+      result = left * right;
+      break;
     case '/':
-      return left / right;
+      result = left / right;
+      break;
     case '%':
-      return left % right;
+      result = left % right;
+      break;
     case '**':
-      return Math.pow(left, right);
+      result = Math.pow(left, right);
+      break;
+    default:
+      result = 0;
   }
+
+  // Check for overflow: if result exceeds safe integer range and both operands are integers,
+  // recalculate with BigInt
+  if (Number.isInteger(left) && Number.isInteger(right) &&
+    (!Number.isFinite(result) || (Number.isInteger(result) &&
+      (result > Number.MAX_SAFE_INTEGER || result < Number.MIN_SAFE_INTEGER)))) {
+    try {
+      const leftBigInt = BigInt(left);
+      const rightBigInt = BigInt(right);
+
+      switch (op) {
+        case '+':
+          return leftBigInt + rightBigInt;
+        case '-':
+          return leftBigInt - rightBigInt;
+        case '*':
+          return leftBigInt * rightBigInt;
+        case '/':
+          return leftBigInt / rightBigInt;
+        case '%':
+          return leftBigInt % rightBigInt;
+        case '**':
+          return leftBigInt ** rightBigInt;
+      }
+    } catch {
+      // If BigInt conversion fails, return the Number result
+      return result;
+    }
+  }
+
+  return result;
 }
 
 // Helper to perform comparison operations with Decimal and BigInt support
