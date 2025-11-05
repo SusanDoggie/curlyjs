@@ -102,3 +102,75 @@ describe('Method Calls', () => {
     expect(t.render(data, testMethods)).toBe('HELLO - world - Test');
   });
 });
+
+describe('Escape Sequences', () => {
+  test('handles \\n (newline) escape sequence', () => {
+    const t = new Template('{{ upper("line1\\nline2") }}');
+    expect(t.render({}, testMethods)).toBe('LINE1\nLINE2');
+  });
+
+  test('handles \\t (tab) escape sequence', () => {
+    const t = new Template('{{ upper("col1\\tcol2") }}');
+    expect(t.render({}, testMethods)).toBe('COL1\tCOL2');
+  });
+
+  test('handles \\r (carriage return) escape sequence', () => {
+    const t = new Template('{{ upper("text\\rmore") }}');
+    expect(t.render({}, testMethods)).toBe('TEXT\rMORE');
+  });
+
+  test('handles \\b (backspace) escape sequence', () => {
+    const t = new Template('{{ upper("text\\bmore") }}');
+    expect(t.render({}, testMethods)).toBe('TEXT\bMORE');
+  });
+
+  test('handles \\f (form feed) escape sequence', () => {
+    const t = new Template('{{ upper("page1\\fpage2") }}');
+    expect(t.render({}, testMethods)).toBe('PAGE1\fPAGE2');
+  });
+
+  test('handles \\v (vertical tab) escape sequence', () => {
+    const t = new Template('{{ upper("text\\vmore") }}');
+    expect(t.render({}, testMethods)).toBe('TEXT\vMORE');
+  });
+
+  test('handles \\\\ (backslash) escape sequence', () => {
+    const t = new Template('{{ join(["a", "b"], "\\\\") }}');
+    expect(t.render({}, testMethods)).toBe('a\\b');
+  });
+
+  test("handles \\' (single quote) escape sequence", () => {
+    const t = new Template("{{ upper('it\\'s') }}");
+    expect(t.render({}, testMethods)).toBe("IT'S");
+  });
+
+  test('handles \\" (double quote) escape sequence', () => {
+    const t = new Template('{{ upper("say \\"hello\\"") }}');
+    expect(t.render({}, testMethods)).toBe('SAY "HELLO"');
+  });
+
+  test('handles \\uXXXX (Unicode) escape sequence', () => {
+    const t = new Template('{{ upper("\\u0041\\u0042\\u0043") }}');
+    expect(t.render({}, testMethods)).toBe('ABC');
+  });
+
+  test('handles \\xXX (hexadecimal) escape sequence', () => {
+    const t = new Template('{{ upper("\\x41\\x42\\x43") }}');
+    expect(t.render({}, testMethods)).toBe('ABC');
+  });
+
+  test('handles multiple escape sequences in one string', () => {
+    const t = new Template('{{ upper("line1\\nline2\\ttab\\\\backslash") }}');
+    expect(t.render({}, testMethods)).toBe('LINE1\nLINE2\tTAB\\BACKSLASH');
+  });
+
+  test('handles escape sequences in single-quoted strings', () => {
+    const t = new Template("{{ upper('tab\\there') }}");
+    expect(t.render({}, testMethods)).toBe('TAB\tHERE');
+  });
+
+  test('handles Unicode emoji with \\uXXXX', () => {
+    const t = new Template('{{ upper("\\u2665") }}');
+    expect(t.render({}, testMethods)).toBe('♥');
+  });
+});
