@@ -192,6 +192,257 @@ describe('Template JSON serialization', () => {
       
       expect(restored.methods).toEqual(original.methods);
     });
+
+    test('should reconstruct a template with array literals', () => {
+      const original = new Template('{{ [1, 2, 3] }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+    });
+
+    test('should reconstruct a template with member access (bracket notation)', () => {
+      const original = new Template('{{ items[0] }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = { items: ['first', 'second', 'third'] };
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should reconstruct a template with member access (string key)', () => {
+      const original = new Template('{{ user["name"] }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = { user: { name: 'Alice' } };
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should reconstruct a template with bitwise AND operator', () => {
+      const original = new Template('{{ a & b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+    });
+
+    test('should reconstruct a template with bitwise OR operator', () => {
+      const original = new Template('{{ a | b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+    });
+
+    test('should reconstruct a template with bitwise XOR operator', () => {
+      const original = new Template('{{ a ^ b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+    });
+
+    test('should reconstruct a template with left shift operator', () => {
+      const original = new Template('{{ a << b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 2 })).toBe(original.render({ a: 5, b: 2 }));
+    });
+
+    test('should reconstruct a template with right shift operator', () => {
+      const original = new Template('{{ a >> b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 20, b: 2 })).toBe(original.render({ a: 20, b: 2 }));
+    });
+
+    test('should reconstruct a template with unsigned right shift operator', () => {
+      const original = new Template('{{ a >>> b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: -20, b: 2 })).toBe(original.render({ a: -20, b: 2 }));
+    });
+
+    test('should reconstruct a template with bitwise NOT operator', () => {
+      const original = new Template('{{ ~a }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5 })).toBe(original.render({ a: 5 }));
+    });
+
+    test('should reconstruct a template with exponentiation operator', () => {
+      const original = new Template('{{ a ** b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 2, b: 3 })).toBe(original.render({ a: 2, b: 3 }));
+    });
+
+    test('should reconstruct a template with subtraction operator', () => {
+      const original = new Template('{{ a - b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 10, b: 3 })).toBe(original.render({ a: 10, b: 3 }));
+    });
+
+    test('should reconstruct a template with multiplication operator', () => {
+      const original = new Template('{{ a * b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+    });
+
+    test('should reconstruct a template with division operator', () => {
+      const original = new Template('{{ a / b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 15, b: 3 })).toBe(original.render({ a: 15, b: 3 }));
+    });
+
+    test('should reconstruct a template with modulo operator', () => {
+      const original = new Template('{{ a % b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 17, b: 5 })).toBe(original.render({ a: 17, b: 5 }));
+    });
+
+    test('should reconstruct a template with equality operator', () => {
+      const original = new Template('{% if a == b %}equal{% else %}not equal{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 5 })).toBe(original.render({ a: 5, b: 5 }));
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+    });
+
+    test('should reconstruct a template with inequality operator', () => {
+      const original = new Template('{% if a != b %}not equal{% else %}equal{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+      expect(restored.render({ a: 5, b: 5 })).toBe(original.render({ a: 5, b: 5 }));
+    });
+
+    test('should reconstruct a template with less than operator', () => {
+      const original = new Template('{% if a < b %}less{% else %}not less{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 3, b: 5 })).toBe(original.render({ a: 3, b: 5 }));
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+    });
+
+    test('should reconstruct a template with greater than operator', () => {
+      const original = new Template('{% if a > b %}greater{% else %}not greater{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 5, b: 3 })).toBe(original.render({ a: 5, b: 3 }));
+      expect(restored.render({ a: 3, b: 5 })).toBe(original.render({ a: 3, b: 5 }));
+    });
+
+    test('should reconstruct a template with less than or equal operator', () => {
+      const original = new Template('{% if a <= b %}lte{% else %}gt{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ a: 3, b: 5 })).toBe(original.render({ a: 3, b: 5 }));
+      expect(restored.render({ a: 5, b: 5 })).toBe(original.render({ a: 5, b: 5 }));
+      expect(restored.render({ a: 7, b: 5 })).toBe(original.render({ a: 7, b: 5 }));
+    });
+
+    test('should reconstruct a template with method calls with multiple arguments', () => {
+      const original = new Template('{{ format(template, arg1, arg2) }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const methods = {
+        format: (tmpl: string, a: string, b: string) => tmpl.replace('{0}', a).replace('{1}', b)
+      };
+      const data = { template: 'Hello {0}, welcome to {1}!', arg1: 'Alice', arg2: 'Wonderland' };
+      expect(restored.render(data, methods)).toBe(original.render(data, methods));
+    });
+
+    test('should reconstruct a template with nested method calls', () => {
+      const original = new Template('{{ upper(lower(name)) }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const methods = {
+        upper: (s: string) => s.toUpperCase(),
+        lower: (s: string) => s.toLowerCase()
+      };
+      expect(restored.render({ name: 'MiXeD' }, methods)).toBe(original.render({ name: 'MiXeD' }, methods));
+    });
+
+    test('should reconstruct a template with method calls with array literal arguments', () => {
+      const original = new Template('{{ join([1, 2, 3], ", ") }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const methods = { join: (arr: any[], sep: string) => arr.join(sep) };
+      expect(restored.render({}, methods)).toBe(original.render({}, methods));
+    });
+
+    test('should reconstruct a template with escape sequences', () => {
+      const original = new Template('{{ "Hello\\nWorld\\t!" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+    });
+
+    test('should reconstruct an empty template', () => {
+      const original = new Template('');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+    });
+
+    test('should reconstruct a text-only template', () => {
+      const original = new Template('Just plain text, no expressions');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+    });
+
+    test('should reconstruct a template with complex mixed expressions', () => {
+      const original = new Template('{{ (a + b) * c - d / e }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = { a: 5, b: 3, c: 2, d: 20, e: 4 };
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should reconstruct a template with nested array indexing', () => {
+      const original = new Template('{{ matrix[0][1] }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = { matrix: [[1, 2, 3], [4, 5, 6], [7, 8, 9]] };
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should reconstruct a template with array literal in for loop', () => {
+      const original = new Template('{% for item in [1, 2, 3] %}{{ item }}{% endfor %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+    });
   });
 
   describe('Round-trip serialization', () => {

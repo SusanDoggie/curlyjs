@@ -35,15 +35,69 @@ function reconstructExpression(expr: ExprNode): string {
       if (typeof expr.value === 'string') {
         return `"${expr.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
       } else if (Array.isArray(expr.value)) {
-        return `[${expr.value.map(v => typeof v === 'string' ? `"${v}"` : String(v)).join(', ')}]`;
+        // Array elements can be ExprNode objects or primitive values
+        return `[${expr.value.map(v => {
+          if (v && typeof v === 'object' && 'type' in v) {
+            // It's an ExprNode
+            return reconstructExpression(v as ExprNode);
+          } else if (typeof v === 'string') {
+            return `"${v}"`;
+          } else {
+            return String(v);
+          }
+        }).join(', ')}]`;
       }
       return String(expr.value);
     case 'variable':
       return expr.name;
     case 'memberAccess':
       return `${reconstructExpression(expr.object)}[${reconstructExpression(expr.property)}]`;
-    case 'binaryOp':
-      return `${reconstructExpression(expr.left)} ${expr.operator} ${reconstructExpression(expr.right)}`;
+    case 'binaryOp': {
+      // Add parentheses around operands if they are binary operations with lower precedence
+      const OPERATOR_PRECEDENCE: Record<string, number> = {
+        '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5,
+        '==': 6, '!=': 6,
+        '<': 7, '>': 7, '<=': 7, '>=': 7,
+        '<<': 8, '>>': 8, '>>>': 8,
+        '+': 9, '-': 9,
+        '*': 10, '/': 10, '%': 10,
+        '**': 11
+      };
+
+      const currentPrecedence = OPERATOR_PRECEDENCE[expr.operator] || 0;
+
+      const leftExpr = expr.left;
+      const rightExpr = expr.right;
+
+      // Add parentheses to left operand if it has lower precedence
+      let leftStr = reconstructExpression(leftExpr);
+      if (leftExpr.type === 'binaryOp') {
+        const leftPrecedence = OPERATOR_PRECEDENCE[leftExpr.operator] || 0;
+        if (leftPrecedence < currentPrecedence) {
+          leftStr = `(${leftStr})`;
+        }
+      }
+
+      // Add parentheses to right operand if it has lower or equal precedence
+      // (equal precedence on right needs parens for left-associative operators)
+      let rightStr = reconstructExpression(rightExpr);
+      if (rightExpr.type === 'binaryOp') {
+        const rightPrecedence = OPERATOR_PRECEDENCE[rightExpr.operator] || 0;
+        // For right-associative operators like **, we need different rules
+        const isRightAssociative = expr.operator === '**';
+        if (isRightAssociative) {
+          if (rightPrecedence < currentPrecedence) {
+            rightStr = `(${rightStr})`;
+          }
+        } else {
+          if (rightPrecedence <= currentPrecedence) {
+            rightStr = `(${rightStr})`;
+          }
+        }
+      }
+
+      return `${leftStr} ${expr.operator} ${rightStr}`;
+    }
     case 'unaryOp':
       return `${expr.operator}${reconstructExpression(expr.operand)}`;
     case 'methodCall':
