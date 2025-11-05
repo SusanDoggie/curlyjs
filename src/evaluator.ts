@@ -25,6 +25,78 @@
 
 import _ from 'lodash';
 import type { TemplateData, TemplateMethods } from './types';
+import type { ExprNode } from './ast';
+
+// Evaluate an expression AST node
+export function evalExprNode(node: ExprNode, data: TemplateData, methods: TemplateMethods): any {
+  switch (node.type) {
+    case 'literal':
+      // For array literals that contain expression nodes, we need to evaluate them
+      if (Array.isArray(node.value)) {
+        return node.value.map(item => {
+          // Check if item is an expression node
+          if (typeof item === 'object' && item !== null && 'type' in item) {
+            return evalExprNode(item as ExprNode, data, methods);
+          }
+          return item;
+        });
+      }
+      return node.value;
+
+    case 'variable':
+      const value = _.get(data, node.name);
+      return !_.isNil(value) ? value : '';
+
+    case 'binaryOp':
+      const leftVal = evalExprNode(node.left, data, methods);
+      const rightVal = evalExprNode(node.right, data, methods);
+
+      switch (node.operator) {
+        case '||':
+          return leftVal || rightVal;
+        case '&&':
+          return leftVal && rightVal;
+        case '==':
+          return _.isEqual(leftVal, rightVal);
+        case '!=':
+          return !_.isEqual(leftVal, rightVal);
+        case '>':
+          return leftVal > rightVal;
+        case '<':
+          return leftVal < rightVal;
+        case '>=':
+          return leftVal >= rightVal;
+        case '<=':
+          return leftVal <= rightVal;
+        case '+':
+          return leftVal + rightVal;
+        case '-':
+          return leftVal - rightVal;
+        case '*':
+          return leftVal * rightVal;
+        case '/':
+          return leftVal / rightVal;
+      }
+      break;
+
+    case 'unaryOp':
+      const operandVal = evalExprNode(node.operand, data, methods);
+      switch (node.operator) {
+        case '!':
+          return !operandVal;
+      }
+      break;
+
+    case 'methodCall':
+      const method = methods[node.methodName];
+      if (!method) return '';
+
+      const evalArgs = node.args.map(arg => evalExprNode(arg, data, methods));
+      return method(...evalArgs);
+  }
+
+  return '';
+}
 
 export function findLogicalOperator(expr: string, operator: string): number {
   // Find logical operator outside of strings, parentheses, and brackets

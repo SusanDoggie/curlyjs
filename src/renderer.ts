@@ -25,7 +25,7 @@
 
 import type { ASTNode } from './ast';
 import type { TemplateData, TemplateMethods } from './types';
-import { evalExpr } from './evaluator';
+import { evalExprNode } from './evaluator';
 
 export function renderNode(node: ASTNode, data: TemplateData, methods: TemplateMethods): string {
   switch (node.type) {
@@ -33,11 +33,11 @@ export function renderNode(node: ASTNode, data: TemplateData, methods: TemplateM
       return node.text;
       
     case 'interpolation':
-      const value = evalExpr(node.expression, data, methods);
+      const value = evalExprNode(node.expression, data, methods);
       return value !== null && value !== undefined ? String(value) : '';
       
     case 'for':
-      const array = evalExpr(node.arrayExpr, data, methods);
+      const array = evalExprNode(node.arrayExpr, data, methods);
       if (!Array.isArray(array)) return '';
       
       return array.map((item, idx) => {
@@ -49,7 +49,7 @@ export function renderNode(node: ASTNode, data: TemplateData, methods: TemplateM
     case 'if':
       // Evaluate each branch condition
       for (const branch of node.branches) {
-        const conditionResult = evalExpr(branch.condition, data, methods);
+        const conditionResult = evalExprNode(branch.condition, data, methods);
         if (conditionResult) {
           return renderNodes(branch.body, data, methods);
         }

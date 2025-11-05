@@ -23,88 +23,81 @@
 //  THE SOFTWARE.
 //
 
-import type { ASTNode } from './ast';
+import type { ASTNode, ExprNode } from './ast';
 
-function isInString(str: string, pos: number): boolean {
-  let inString = false;
-  let quoteChar = '';
-  for (let i = 0; i < pos; i++) {
-    const char = str[i];
-    if ((char === '"' || char === "'") && (i === 0 || str[i-1] !== '\\')) {
-      if (!inString) {
-        inString = true;
-        quoteChar = char;
-      } else if (char === quoteChar) {
-        inString = false;
-        quoteChar = '';
+export function extractFromExprNode(node: ExprNode, variables: Set<string>, loopVars: Set<string>): void {
+  switch (node.type) {
+    case 'literal':
+      // Check if the literal is an array containing expression nodes
+      if (Array.isArray(node.value)) {
+        for (const item of node.value) {
+          if (typeof item === 'object' && item !== null && 'type' in item) {
+            extractFromExprNode(item as ExprNode, variables, loopVars);
+          }
+        }
       }
-    }
-  }
-  return inString;
-}
+      break;
 
-export function extractFromExpression(expr: string, variables: Set<string>, loopVars: Set<string>): void {
-  // First, collect all method names to exclude them from variables
-  const methodNames = new Set<string>();
-  const methodMatches = expr.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g);
-  for (const match of methodMatches) {
-    const methodName = match[1];
-    const position = match.index!;
+    case 'variable':
+      // Get the root variable (before any dots)
+      const rootVar = node.name.split('.')[0];
+      // Skip loop variables
+      if (!loopVars.has(rootVar)) {
+        variables.add(rootVar);
+      }
+      break;
 
-    // Skip if inside a string literal
-    if (isInString(expr, position)) {
-      continue;
-    }
+    case 'binaryOp':
+      extractFromExprNode(node.left, variables, loopVars);
+      extractFromExprNode(node.right, variables, loopVars);
+      break;
 
-    methodNames.add(methodName);
-  }
+    case 'unaryOp':
+      extractFromExprNode(node.operand, variables, loopVars);
+      break;
 
-  // Find all potential variable references
-  const varMatches = expr.matchAll(/\b([a-zA-Z_][\w.]*)\b/g);
-  for (const match of varMatches) {
-    const varName = match[1];
-    const position = match.index!;
-    
-    // Skip if inside a string literal
-    if (isInString(expr, position)) {
-      continue;
-    }
-    
-    // Skip keywords and literals
-    if (varName === 'true' || varName === 'false' || !isNaN(Number(varName))) {
-      continue;
-    }
-
-    // Get the root variable (before any dots)
-    const rootVar = varName.split('.')[0];
-    
-    // Skip if this is a method name
-    if (methodNames.has(rootVar)) {
-      continue;
-    }
-
-    // Skip loop variables
-    if (loopVars.has(rootVar)) {
-      continue;
-    }
-    
-    variables.add(rootVar);
+    case 'methodCall':
+      // Extract variables from method arguments
+      for (const arg of node.args) {
+        extractFromExprNode(arg, variables, loopVars);
+      }
+      break;
   }
 }
 
-export function extractMethodsFromExpression(expr: string, methods: Set<string>): void {
-  // Find all method calls: methodName(
-  const methodMatches = expr.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g);
-  for (const match of methodMatches) {
-    const methodName = match[1];
-    const position = match.index!;
+export function extractMethodsFromExprNode(node: ExprNode, methods: Set<string>): void {
+  switch (node.type) {
+    case 'literal':
+      // Check if the literal is an array containing expression nodes
+      if (Array.isArray(node.value)) {
+        for (const item of node.value) {
+          if (typeof item === 'object' && item !== null && 'type' in item) {
+            extractMethodsFromExprNode(item as ExprNode, methods);
+          }
+        }
+      }
+      break;
 
-    // Skip if inside a string literal
-    if (isInString(expr, position)) {
-      continue;
-    }
+    case 'variable':
+      // No methods in variable nodes
+      break;
 
-    methods.add(methodName);
+    case 'binaryOp':
+      extractMethodsFromExprNode(node.left, methods);
+      extractMethodsFromExprNode(node.right, methods);
+      break;
+
+    case 'unaryOp':
+      extractMethodsFromExprNode(node.operand, methods);
+      break;
+
+    case 'methodCall':
+      methods.add(node.methodName);
+      // Also extract methods from arguments
+      for (const arg of node.args) {
+        extractMethodsFromExprNode(arg, methods);
+      }
+      break;
   }
 }
 
@@ -116,12 +109,12 @@ export function extractVariables(nodes: ASTNode[], variables: Set<string>, loopV
         break;
         
       case 'interpolation':
-        extractFromExpression(node.expression, variables, loopVars);
+        extractFromExprNode(node.expression, variables, loopVars);
         break;
         
       case 'for':
         // Extract variables from the array expression
-        extractFromExpression(node.arrayExpr, variables, loopVars);
+        extractFromExprNode(node.arrayExpr, variables, loopVars);
         // Create new loop vars set including the item and index vars
         const newLoopVars = new Set([...loopVars, node.itemVar]);
         if (node.indexVar) newLoopVars.add(node.indexVar);
@@ -132,7 +125,7 @@ export function extractVariables(nodes: ASTNode[], variables: Set<string>, loopV
       case 'if':
         // Extract from all branch conditions
         for (const branch of node.branches) {
-          extractFromExpression(branch.condition, variables, loopVars);
+          extractFromExprNode(branch.condition, variables, loopVars);
           extractVariables(branch.body, variables, loopVars);
         }
         // Extract from else body if exists
@@ -152,12 +145,12 @@ export function extractMethods(nodes: ASTNode[], methods: Set<string>): void {
         break;
 
       case 'interpolation':
-        extractMethodsFromExpression(node.expression, methods);
+        extractMethodsFromExprNode(node.expression, methods);
         break;
 
       case 'for':
         // Extract methods from the array expression
-        extractMethodsFromExpression(node.arrayExpr, methods);
+        extractMethodsFromExprNode(node.arrayExpr, methods);
         // Recursively extract from body
         extractMethods(node.body, methods);
         break;
@@ -165,7 +158,7 @@ export function extractMethods(nodes: ASTNode[], methods: Set<string>): void {
       case 'if':
         // Extract from all branch conditions
         for (const branch of node.branches) {
-          extractMethodsFromExpression(branch.condition, methods);
+          extractMethodsFromExprNode(branch.condition, methods);
           extractMethods(branch.body, methods);
         }
         // Extract from else body if exists

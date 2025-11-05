@@ -23,7 +23,43 @@
 //  THE SOFTWARE.
 //
 
-// AST Node types
+// Expression AST Node types
+export interface BaseExprNode {
+  type: string;
+}
+
+export interface LiteralNode extends BaseExprNode {
+  type: 'literal';
+  value: string | number | boolean | any[];
+}
+
+export interface VariableNode extends BaseExprNode {
+  type: 'variable';
+  name: string;
+}
+
+export interface BinaryOpNode extends BaseExprNode {
+  type: 'binaryOp';
+  operator: '||' | '&&' | '==' | '!=' | '>' | '<' | '>=' | '<=' | '+' | '-' | '*' | '/';
+  left: ExprNode;
+  right: ExprNode;
+}
+
+export interface UnaryOpNode extends BaseExprNode {
+  type: 'unaryOp';
+  operator: '!';
+  operand: ExprNode;
+}
+
+export interface MethodCallNode extends BaseExprNode {
+  type: 'methodCall';
+  methodName: string;
+  args: ExprNode[];
+}
+
+export type ExprNode = LiteralNode | VariableNode | BinaryOpNode | UnaryOpNode | MethodCallNode;
+
+// Template AST Node types
 export interface BaseNode {
   type: string;
 }
@@ -35,19 +71,19 @@ export interface TextNode extends BaseNode {
 
 export interface InterpolationNode extends BaseNode {
   type: 'interpolation';
-  expression: string;
+  expression: ExprNode;
 }
 
 export interface ForLoopNode extends BaseNode {
   type: 'for';
   itemVar: string;
   indexVar: string | null;
-  arrayExpr: string;
+  arrayExpr: ExprNode;
   body: ASTNode[];
 }
 
 export interface IfBranch {
-  condition: string;
+  condition: ExprNode;
   body: ASTNode[];
 }
 

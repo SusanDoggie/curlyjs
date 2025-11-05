@@ -23,7 +23,8 @@
 //  THE SOFTWARE.
 //
 
-import type { ASTNode, TextNode, InterpolationNode, ForLoopNode, IfNode, IfBranch } from './ast';
+import type { ASTNode, TextNode, InterpolationNode, ForLoopNode, IfNode, IfBranch, ExprNode } from './ast';
+import { parseExpression } from './exprParser';
 
 function createTextNode(text: string): TextNode {
   return {
@@ -35,7 +36,7 @@ function createTextNode(text: string): TextNode {
 function createInterpolationNode(expression: string): InterpolationNode {
   return {
     type: 'interpolation',
-    expression
+    expression: parseExpression(expression)
   };
 }
 
@@ -49,7 +50,7 @@ function createForLoopNode(
     type: 'for',
     itemVar,
     indexVar,
-    arrayExpr,
+    arrayExpr: parseExpression(arrayExpr),
     body
   };
 }
@@ -157,7 +158,7 @@ export function parseIfBlock(template: string, ifTagStart: number, ifTagEnd: num
         elseBody = parseTemplate(branchBody);
       } else {
         branches.push({
-          condition: currentCondition,
+          condition: parseExpression(currentCondition),
           body: parseTemplate(branchBody)
         });
       }
@@ -173,7 +174,7 @@ export function parseIfBlock(template: string, ifTagStart: number, ifTagEnd: num
         // Save the current branch
         const branchBody = template.slice(branchStart, nextTag);
         branches.push({
-          condition: currentCondition!,
+          condition: parseExpression(currentCondition!),
           body: parseTemplate(branchBody)
         });
 
@@ -188,7 +189,7 @@ export function parseIfBlock(template: string, ifTagStart: number, ifTagEnd: num
         // Save the current branch
         const branchBody = template.slice(branchStart, nextTag);
         branches.push({
-          condition: currentCondition!,
+          condition: parseExpression(currentCondition!),
           body: parseTemplate(branchBody)
         });
 
