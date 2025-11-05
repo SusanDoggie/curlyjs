@@ -1,4 +1,107 @@
-# AI Coding Agent Instructions
+# AI Coding Agent Instructions for CurlyJS
+
+## Project Overview
+
+CurlyJS is a lightweight, AST-based JavaScript template engine with Jinja2-like syntax. The architecture follows a clean parsing pipeline:
+
+**Template String → Tokenization → AST → Evaluation → Rendered Output**
+
+### Core Components (src/)
+
+- **`template.ts`**: Main API - `Template` class with `.render()`, `.toJSON()`, `.fromJSON()`, `.variables`, `.methods`
+- **`parser.ts`**: Converts template strings to AST nodes (TextNode, InterpolationNode, ForLoopNode, IfNode, CommentNode)
+- **`exprParser.ts`**: Expression parser using Shunting-yard algorithm for operator precedence
+- **`evaluator.ts`**: Evaluates expression AST nodes (handles variables, operators, method calls)
+- **`renderer.ts`**: Traverses AST and generates output strings
+- **`analyzer.ts`**: Extracts variables and methods from AST for dependency analysis
+- **`ast.ts`**: TypeScript interfaces for all AST node types
+- **`types.ts`**: Public API types (`TemplateData`, `TemplateMethods`)
+
+### Key Architecture Patterns
+
+1. **Two-Level AST**: Template AST (control flow) wraps Expression AST (calculations/conditions)
+2. **Immutability**: Template instances are immutable; AST is built once at construction
+3. **Private fields**: Use `#` syntax for encapsulation (`#template`, `#ast`)
+4. **Serialization**: `toJSON()` exports AST, `fromJSON()` reconstructs by converting AST back to template string
+5. **Dependency extraction**: `variables` and `methods` getters analyze AST without execution
+
+## Development Workflows
+
+### Build & Test Commands
+
+```bash
+yarn rollup              # Build dist/ (CJS + ESM + .d.ts)
+yarn test                # Run Jest tests
+yarn clean               # Remove dist/
+```
+
+### Testing Patterns
+
+- **Use `runTests` tool** for test execution (preferred over terminal commands)
+- **Test location**: `tests/*.test.ts` with comprehensive coverage
+- **Test helpers**: Import `testMethods` from `tests/helpers.ts` for common template methods (upper, lower, join, etc.)
+- **Test structure**: Use `describe` blocks organized by feature, test edge cases explicitly
+- **Assertion style**: Direct Jest `expect()` assertions, test both success and error cases
+
+### Making Changes
+
+1. **Parser changes**: Update `parser.ts` → regenerate AST → update `template.ts` reconstruction if needed
+2. **New operators**: Add to `OPERATORS` table in `exprParser.ts` with precedence, implement in `evaluator.ts`
+3. **New node types**: Define in `ast.ts` → implement parsing, rendering, analysis, reconstruction
+4. **Always verify**: Run tests after any changes to parser/evaluator (template syntax is fragile)
+
+## Project-Specific Conventions
+
+### Error Handling
+- Throw descriptive errors with position info: `throw new Error('Unclosed tag at position ' + pos)`
+- Missing variables render as empty string (no errors)
+- Invalid syntax throws during parsing (fail-fast)
+
+### Expression Parsing
+- Uses **Shunting-yard algorithm** for operator precedence
+- Right-associative: `**` (exponentiation)
+- Left-associative: All other binary operators
+- Unary operators: `!` (logical NOT), `~` (bitwise NOT)
+
+### Template Syntax Support
+- Variables: `{{ user.name }}`
+- Control flow: `{% if condition %}...{% elif %}...{% else %}...{% endif %}`
+- Loops: `{% for item, index in items %}...{% endfor %}`
+- Comments: `{# ignored #}`
+- Method calls: `{{ upper(name) }}`, `{{ format(str, arg1, arg2) }}`
+
+### Code Style
+- TypeScript `strict` mode enabled
+- Use lodash `_.get()`, `_.isNil()`, `_.isEqual()` for safe data access
+- Prefer `const` over `let`, avoid `var`
+- Export only public API from `index.ts` (template, ast, types)
+
+## Critical Implementation Details
+
+### Parser State Management
+- Track depth counters for nested structures (if/for blocks)
+- Use `findMatchingEnd()` to locate block terminators
+- Handle `elif`/`else` at correct nesting level (check depth === 0)
+
+### Expression Evaluation
+- Array literals in expressions are stored as `LiteralNode` with array value
+- Method calls store argument count during parsing for correct stack unwinding
+- Use `evalExprNode()` recursively for nested expressions
+
+### Serialization Round-Trip
+- `toJSON()` → AST → `JSON.stringify()` → storage/network
+- `fromJSON()` → AST → `reconstructTemplate()` → `new Template()` → same behavior
+- Reconstruction must preserve exact template syntax for variables/methods extraction
+
+## Common Pitfalls
+
+- **Don't parse template strings multiple times** - cache Template instances
+- **Loop variables excluded from `.variables`** - they're local scope
+- **Comments render as empty string** - not removed from AST (for analysis)
+- **Missing closing tags** - parser throws, must be caught by consumer
+- **Operator precedence** - use parentheses in complex expressions to avoid surprises
+
+---
 
 ## AI Agent Guidelines
 
