@@ -579,6 +579,172 @@ describe('Template JSON serialization', () => {
       expect(restored.render(data2)).toBe(original.render(data2));
       expect(restored.render(data2)).toBe('not equal');
     });
+
+    test('should reconstruct a template with BigInt literals', () => {
+      const original = new Template('{{ 1234567890123456789 }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('1234567890123456789');
+    });
+
+    test('should reconstruct a template with BigInt literal addition', () => {
+      const original = new Template('{{ 1000000000000000000 + 2000000000000000000 }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('3000000000000000000');
+    });
+
+    test('should reconstruct a template with BigInt literal multiplication', () => {
+      const original = new Template('{{ 1000000000000000 * 1000000000000000 }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('1000000000000000000000000000000');
+    });
+
+    test('should reconstruct a template with overflow detection in multiplication', () => {
+      const original = new Template('{{ 1000000000000 * 1000000000000 }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('1000000000000000000000000');
+    });
+
+    test('should reconstruct a template with overflow detection in addition', () => {
+      const original = new Template('{{ 9007199254740991 + 9007199254740991 }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('18014398509481982');
+    });
+
+    test('should reconstruct a template with overflow detection in exponentiation', () => {
+      const original = new Template('{{ 1000 ** 10 }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('1000000000000000000000000000000');
+    });
+
+    test('should reconstruct a template with mixed BigInt and Decimal', () => {
+      const original = new Template('{{ a + b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        a: BigInt(100),
+        b: new Decimal('0.5'),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('100.5');
+    });
+
+    test('should reconstruct a template with BigInt in conditionals', () => {
+      const original = new Template('{% if x > 1000000000000000000 %}big{% else %}small{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data1 = { x: BigInt('2000000000000000000') };
+      const data2 = { x: BigInt('500000000000000000') };
+
+      expect(restored.render(data1)).toBe(original.render(data1));
+      expect(restored.render(data1)).toBe('big');
+      expect(restored.render(data2)).toBe(original.render(data2));
+      expect(restored.render(data2)).toBe('small');
+    });
+
+    test('should reconstruct a template with BigInt literal comparison', () => {
+      const original = new Template('{% if 9999999999999999999 > 1000000000000000000 %}yes{% else %}no{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('yes');
+    });
+
+    test('should reconstruct a template with BigInt in for loops', () => {
+      const original = new Template('{% for n in numbers %}{{ n }},{% endfor %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        numbers: [
+          BigInt('1000000000000000000'),
+          BigInt('2000000000000000000'),
+          BigInt('3000000000000000000'),
+        ],
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('1000000000000000000,2000000000000000000,3000000000000000000,');
+    });
+
+    test('should reconstruct a template with complex BigInt expression', () => {
+      const original = new Template('{{ (a + b) * c }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        a: BigInt('1000000000000000000'),
+        b: BigInt('2000000000000000000'),
+        c: BigInt('3'),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('9000000000000000000');
+    });
+
+    test('should reconstruct a template with Decimal division precision', () => {
+      const original = new Template('{{ a / b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        a: new Decimal('1'),
+        b: new Decimal('3'),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should reconstruct a template with mixed type subtraction', () => {
+      const original = new Template('{{ a - b }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = {
+        a: BigInt('1000000000000000000'),
+        b: new Decimal('0.5'),
+      };
+      expect(restored.render(data)).toBe(original.render(data));
+      expect(restored.render(data)).toBe('999999999999999999.5');
+    });
+
+    test('should reconstruct a template with BigInt modulo operation', () => {
+      const original = new Template('{{ 10000000000000000000 % 3 }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.render({})).toBe('1');
+    });
+
+    test('should reconstruct a template with large integer literal in method call', () => {
+      const original = new Template('{{ format(1234567890123456789) }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const methods = {
+        format: (n: bigint) => `Number: ${n}`,
+      };
+      expect(restored.render({}, methods)).toBe(original.render({}, methods));
+      expect(restored.render({}, methods)).toBe('Number: 1234567890123456789');
+    });
   });
 
   describe('Round-trip serialization', () => {
