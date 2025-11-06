@@ -59,8 +59,6 @@ function reconstructExpression(expr: ExprNode): string {
           }
         }).join(', ')}]`;
       }
-
-      // No fallback - throw error for invalid AST format
       throw new Error(`Invalid literal node: missing or unknown dataType '${litNode.dataType}'`);
     }
     case 'variable':
