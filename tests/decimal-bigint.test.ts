@@ -424,7 +424,7 @@ describe('Decimal and BigInt Support', () => {
   });
 
   describe('Decimal with methods', () => {
-    test('should pass Decimal values to methods', () => {
+    test('should pass converted numeric values to methods (not Decimal instances)', () => {
       const template = new Template('{{ formatCurrency(price) }}');
       const result = template.render(
         {
@@ -432,17 +432,17 @@ describe('Decimal and BigInt Support', () => {
         },
         {
           formatCurrency: (val: any) => {
-            if (val instanceof Decimal) {
-              return `$${val.toFixed(2)}`;
-            }
-            return `$${val}`;
+            // Methods receive standard JavaScript Number, not Decimal instances
+            expect(typeof val).toBe('number');
+            expect(val).toBe(19.99);
+            return `$${val.toFixed(2)}`;
           },
         }
       );
       expect(result).toBe('$19.99');
     });
 
-    test('should return Decimal from methods', () => {
+    test('should return Decimal from methods and use in calculations', () => {
       const template = new Template('{{ calculate(a, b) + c }}');
       const result = template.render(
         {
@@ -451,7 +451,13 @@ describe('Decimal and BigInt Support', () => {
           c: new Decimal('5'),
         },
         {
-          calculate: (a: Decimal, b: Decimal) => a.plus(b),
+          // Methods receive standard JavaScript Numbers, not Decimal
+          calculate: (a: number, b: number) => {
+            expect(typeof a).toBe('number');
+            expect(typeof b).toBe('number');
+            // But methods can return Decimal if needed for precise calculations
+            return new Decimal(a).plus(new Decimal(b));
+          },
         }
       );
       expect(result).toBe('35');

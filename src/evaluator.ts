@@ -464,15 +464,23 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
 
       const evalArgs = node.args.map(arg => {
         const val = evalExprNode(arg, data, methods);
-        // Convert BigInt to Number for method arguments to avoid "Cannot convert BigInt" errors
-        // Most JavaScript methods expect Number, not BigInt
+
+        // Convert special types to standard JavaScript types for method arguments.
+        // User-provided methods should only receive standard JS types (string, number, boolean, array, object, null).
+        // Internal calculations maintain precision with BigInt/Decimal, but method boundaries normalize to JS types.
+
         if (typeof val === 'bigint') {
-          // Only convert if the value fits in a safe integer range
-          const num = Number(val);
-          if (Number.isSafeInteger(num)) {
-            return num;
-          }
+          // Convert BigInt to Number
+          // Note: May lose precision for values outside safe integer range
+          return Number(val);
         }
+
+        if (val instanceof Decimal) {
+          // Convert Decimal to Number
+          // Note: May lose precision for values with high decimal precision
+          return val.toNumber();
+        }
+
         return val;
       });
       return method(...evalArgs);

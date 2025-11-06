@@ -94,6 +94,29 @@ yarn clean               # Remove dist/
 - Method calls store argument count during parsing for correct stack unwinding
 - Use `evalExprNode()` recursively for nested expressions
 
+### Method Argument Type Normalization
+**CRITICAL:** User-provided methods receive only standard JavaScript types:
+- **Type conversion at method boundaries**: When calling user methods, all arguments are automatically converted to standard JS types:
+  - `BigInt` → `Number` (may lose precision for very large values)
+  - `Decimal` → `Number` (may lose precision for high-precision decimals)
+  - Other types (string, number, boolean, array, object, null) → passed as-is
+- **Why this matters**: Users should not need to handle special types like `BigInt` or `Decimal` in their method implementations
+- **Internal precision preserved**: CurlyJS maintains `BigInt`/`Decimal` precision during internal calculations (arithmetic, comparisons)
+- **Clear API boundary**: Methods are the boundary where precise types are normalized to standard JS types
+- **Method return values**: Methods can return any type, including `BigInt` or `Decimal`, which will be used in subsequent template calculations
+- **Example**:
+  ```typescript
+  const template = new Template('{{ formatPrice(price) }}');
+  template.render(
+    { price: new Decimal('19.99') },
+    {
+      // Method receives Number (19.99), not Decimal instance
+      formatPrice: (val: number) => `$${val.toFixed(2)}`
+    }
+  );
+  ```
+- **Testing**: Always verify methods receive standard types in tests, not `BigInt` or `Decimal` instances
+
 ### Numerical Precision
 **CRITICAL:** Always preserve numerical precision when possible:
 - **BigInt and Decimal.js support**: Use `BigInt` for large integers, `Decimal.js` for precise decimal calculations
