@@ -94,12 +94,37 @@ yarn clean               # Remove dist/
 - Method calls store argument count during parsing for correct stack unwinding
 - Use `evalExprNode()` recursively for nested expressions
 
+### Numerical Precision
+**CRITICAL:** Always preserve numerical precision when possible:
+- **BigInt and Decimal.js support**: Use `BigInt` for large integers, `Decimal.js` for precise decimal calculations
+- **Mixed-type calculations**: When mixing `int`/`BigInt`/`Decimal` types, preserve all precision if possible
+  - Example: `BigInt(5) + BigInt(3)` → `BigInt(8)` (maintain BigInt)
+  - Example: `Decimal('0.1') + Decimal('0.2')` → `Decimal('0.3')` (maintain Decimal precision)
+- **JavaScript number fallback**: If mixing precise types with JavaScript `number` (which can't maintain precision), it's acceptable to convert the result to `number`
+  - Example: `BigInt(5) + 3.14` → `8.14` (number) - precision loss is acceptable here
+  - Example: `Decimal('0.1') * 2` → `0.2` (can be number if context allows)
+- **Type coercion rules**: Follow predictable type promotion: `number` < `BigInt` < `Decimal`
+- **Always test precision**: Add test cases for mixed-type arithmetic in relevant test files
+
 ### Serialization Round-Trip
 - `toJSON()` → AST → `JSON.stringify()` → storage/network
 - `fromJSON()` → AST → `reconstructTemplate()` → `new Template()` → same behavior
 - Reconstruction must preserve exact template syntax for variables/methods extraction
 - **CRITICAL**: Always test new features with JSON serialization in `tests/json-serialization.test.ts`
 - When adding new operators, data types, or syntax features, verify the reconstructed template produces identical output to the original
+
+### AST and JSON Compatibility
+**CRITICAL:** The AST structure must always be JSON-compatible:
+- **No circular references**: AST nodes must form a tree structure, not a graph
+- **JSON-serializable types only**: All AST node properties must be JSON-serializable
+  - ✅ Allowed: `string`, `number`, `boolean`, `null`, arrays, plain objects
+  - ❌ Not allowed: Functions, Symbols, `undefined`, class instances (except those with `toJSON()`)
+  - ⚠️ Special handling: `BigInt` and `Decimal` must be serialized as strings in AST
+- **`toJSON()` must produce valid JSON**: The output must be parseable by `JSON.parse()`
+- **`fromJSON()` must accept valid JSON**: Only use standard JSON types as input
+- **Test round-trip**: Always verify `JSON.parse(JSON.stringify(template.toJSON()))` works correctly
+- **Version compatibility**: Consider adding version field to JSON output for future migrations
+- **Why this matters**: Templates may be stored in databases, sent over networks, or cached - all require pure JSON
 
 ## Common Pitfalls
 
@@ -109,6 +134,8 @@ yarn clean               # Remove dist/
 - **Missing closing tags** - parser throws, must be caught by consumer
 - **Operator precedence** - use parentheses in complex expressions to avoid surprises
 - **Forgetting JSON serialization tests** - new features must work after `toJSON()`/`fromJSON()` round-trip
+- **Non-JSON-compatible AST** - all AST node values must be JSON-serializable (no functions, undefined, circular refs)
+- **Precision loss in calculations** - maintain BigInt/Decimal types through calculations when possible
 
 ---
 

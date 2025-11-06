@@ -263,6 +263,43 @@ const t3 = new Template('{{ a ** b }}');
 t3.render({ a: 2, b: 3 }); // "8"
 ```
 
+#### String Concatenation
+
+The `+` operator performs string concatenation when at least one operand is a string:
+
+```typescript
+// String + String
+const t1 = new Template('{{ firstName + " " + lastName }}');
+t1.render({ firstName: 'John', lastName: 'Doe' }); // "John Doe"
+
+// String + Number
+const t2 = new Template('{{ prefix + count }}');
+t2.render({ prefix: 'Item #', count: 42 }); // "Item #42"
+
+// String + Decimal
+const t3 = new Template('{{ prefix + price }}');
+t3.render({ prefix: 'Price: $', price: new Decimal('19.99') }); // "Price: $19.99"
+
+// String + BigInt
+const t4 = new Template('{{ prefix + count }}');
+t4.render({ prefix: 'Count: ', count: BigInt(1000000) }); // "Count: 1000000"
+```
+
+**Note on type coercion:**
+- When both operands are numbers, `+` performs addition
+- When at least one operand is a string, `+` performs concatenation
+- String literals (e.g., `'0.1'`) are treated as strings, not numbers
+
+```typescript
+// Numeric addition
+const t1 = new Template('{{ a + b }}');
+t1.render({ a: 5, b: 3 }); // "8"
+
+// String concatenation (not addition)
+const t2 = new Template('{{ a + b }}');
+t2.render({ a: '0.1', b: '0.2' }); // "0.10.2"
+```
+
 #### Bitwise Operators
 
 Supported operators:
