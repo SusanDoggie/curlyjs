@@ -24,8 +24,41 @@
 //
 
 import type { ExprNode, LiteralNode, VariableNode, BinaryOpNode, UnaryOpNode, MethodCallNode, MemberAccessNode } from './ast';
-import { parseNumber } from './utils';
 import Decimal from 'decimal.js';
+
+/**
+ * Parse a number string intelligently:
+ * - Use BigInt for large integers outside safe integer range
+ * - Use Decimal for numbers with decimal points (for precision)
+ * - Use Number for safe integers
+ * 
+ * @param str - The string representation of the number
+ * @returns A number, bigint, or Decimal depending on the value
+ */
+function parseNumber(str: string): number | bigint | Decimal {
+  // Check if it has a decimal point or scientific notation
+  if (str.includes('.') || str.toLowerCase().includes('e')) {
+    // Use Decimal for precision with decimal numbers
+    return new Decimal(str);
+  }
+
+  // Integer: detect if it's a large integer
+  const isNegative = str.startsWith('-');
+  const absStr = isNegative ? str.slice(1) : str;
+
+  // Numbers with more than 15 digits use BigInt to avoid precision loss
+  if (absStr.length > 15) {
+    try {
+      return BigInt(str);
+    } catch {
+      // If BigInt parsing fails, fall back to Number
+      return Number(str);
+    }
+  }
+
+  // For numbers with 15 or fewer digits, use regular Number
+  return Number(str);
+}
 
 // Operator precedence and associativity table
 // Higher precedence = evaluated first

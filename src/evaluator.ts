@@ -27,7 +27,164 @@ import _ from 'lodash';
 import Decimal from 'decimal.js';
 import type { TemplateData, TemplateMethods } from './types';
 import type { ExprNode } from './ast';
-import { NumericValue } from './utils';
+
+/**
+ * NumericValue is a helper class for storing and manipulating numeric values
+ * with high precision. It uses BigInt for integer parts and Decimal for decimal parts
+ * to maintain precision during calculations.
+ */
+export class NumericValue {
+  private intPart: bigint = BigInt(0);
+  private decimalPart: Decimal = new Decimal(0);
+  private isNegative: boolean = false;
+  private wasDecimal: boolean = false; // Track if the original value was a Decimal
+
+  constructor(value: number | bigint | Decimal | string) {
+    if (value instanceof Decimal) {
+      // Convert Decimal directly
+      this.wasDecimal = true;
+      this.isNegative = value.isNegative();
+      const absValue = value.abs();
+      this.intPart = BigInt(absValue.floor().toString());
+      const decimalPartValue = absValue.minus(absValue.floor());
+      this.decimalPart = decimalPartValue;
+    } else if (typeof value === 'bigint') {
+      this.wasDecimal = false;
+      this.isNegative = value < BigInt(0);
+      this.intPart = value < BigInt(0) ? -value : value;
+      this.decimalPart = new Decimal(0);
+    } else if (typeof value === 'number') {
+      this.wasDecimal = false;
+      this.parseFromString(value.toString());
+    } else {
+      this.wasDecimal = false;
+      this.parseFromString(value);
+    }
+  }
+
+  private parseFromString(str: string) {
+    this.isNegative = str.startsWith('-');
+    const absStr = this.isNegative ? str.slice(1) : str;
+
+    const parts = absStr.split('.');
+    this.intPart = parts[0] ? BigInt(parts[0]) : BigInt(0);
+
+    if (parts[1]) {
+      this.decimalPart = new Decimal(`0.${parts[1]}`);
+    } else {
+      this.decimalPart = new Decimal(0);
+    }
+  }
+
+  /**
+   * Get the integer part as BigInt
+   */
+  getIntPart(): bigint {
+    return this.isNegative ? -this.intPart : this.intPart;
+  }
+
+  /**
+   * Check if the value has a decimal part
+   */
+  hasDecimalPart(): boolean {
+    return !this.decimalPart.isZero();
+  }
+
+  /**
+   * Convert to Decimal for precise calculations
+   */
+  toDecimal(): Decimal {
+    const sign = this.isNegative ? '-' : '';
+    const intStr = this.intPart.toString();
+    const decStr = this.decimalPart.toString();
+
+    if (this.decimalPart.isZero()) {
+      return new Decimal(`${sign}${intStr}`);
+    }
+
+    // decStr is like "0.123", we want just ".123"
+    const decimalOnly = decStr.startsWith('0.') ? decStr.slice(1) : `.${decStr}`;
+    return new Decimal(`${sign}${intStr}${decimalOnly}`);
+  }
+
+  /**
+   * Convert to BigInt (truncates decimal part)
+   */
+  toBigInt(): bigint {
+    return this.getIntPart();
+  }
+
+  /**
+   * Convert to number (may lose precision)
+   */
+  toNumber(): number {
+    return Number(this.toString());
+  }
+
+  /**
+   * Convert to string representation
+   */
+  toString(): string {
+    return this.toDecimal().toString();
+  }
+
+  /**
+   * Check if this is an integer (no decimal part)
+   */
+  isInteger(): boolean {
+    return !this.hasDecimalPart();
+  }
+
+  /**
+   * Perform arithmetic operations with another NumericValue
+   * Returns the appropriate type: BigInt for integer results, Decimal for non-integer results
+   */
+  add(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().plus(other.toDecimal());
+    }
+    return this.getIntPart() + other.getIntPart();
+  }
+
+  subtract(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().minus(other.toDecimal());
+    }
+    return this.getIntPart() - other.getIntPart();
+  }
+
+  multiply(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().times(other.toDecimal());
+    }
+    return this.getIntPart() * other.getIntPart();
+  }
+
+  divide(other: NumericValue): bigint | Decimal {
+    // Always use Decimal division for accurate results
+    // Division should produce exact results, not truncate like integer division
+    return this.toDecimal().dividedBy(other.toDecimal());
+  }
+
+  modulo(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().modulo(other.toDecimal());
+    }
+    return this.getIntPart() % other.getIntPart();
+  }
+
+  power(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().pow(other.toDecimal());
+    }
+    return this.getIntPart() ** other.getIntPart();
+  }
+}
 
 // Helper to perform arithmetic operations with Decimal support
 function performArithmetic(
