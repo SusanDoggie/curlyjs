@@ -30,7 +30,7 @@ export interface BaseExprNode {
 
 export interface LiteralNode extends BaseExprNode {
   type: 'literal';
-  value: string | number | boolean | bigint | any[];
+  value: string | number | boolean | bigint | ExprNode[];
 }
 
 export interface VariableNode extends BaseExprNode {
