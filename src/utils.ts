@@ -148,13 +148,9 @@ export class NumericValue {
   }
 
   divide(other: NumericValue): bigint | Decimal {
-    // If either was originally a Decimal, use Decimal arithmetic
-    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
-      return this.toDecimal().dividedBy(other.toDecimal());
-    }
-
-    // For BigInt integer division, use JavaScript's default integer division behavior
-    return this.getIntPart() / other.getIntPart();
+    // Always use Decimal division for accurate results
+    // Division should produce exact results, not truncate like integer division
+    return this.toDecimal().dividedBy(other.toDecimal());
   }
 
   modulo(other: NumericValue): bigint | Decimal {

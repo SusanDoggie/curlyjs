@@ -235,7 +235,8 @@ describe('Decimal and BigInt Support', () => {
         a: BigInt(100),
         b: BigInt(3),
       });
-      expect(result).toBe('33'); // Integer division
+      // Division should produce exact results with decimals, not truncate
+      expect(result).toMatch(/^33\.3+$/);
     });
 
     test('should handle BigInt modulo correctly', () => {
@@ -599,7 +600,7 @@ describe('Decimal and BigInt Support', () => {
     test('should handle BigInt division (integer division)', () => {
       const template = new Template('{{ 999999999999999999 / 2 }}');
       const result = template.render({});
-      expect(result).toBe('499999999999999999');
+      expect(result).toBe('499999999999999999.5');
     });
 
     test('should handle BigInt modulo', () => {
