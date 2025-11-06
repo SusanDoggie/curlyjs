@@ -27,28 +27,34 @@ import Decimal from 'decimal.js';
 
 /**
  * NumericValue is a helper class for storing and manipulating numeric values
- * with high precision. It splits numbers into integer and decimal parts to
- * maintain precision during calculations.
+ * with high precision. It uses BigInt for integer parts and Decimal for decimal parts
+ * to maintain precision during calculations.
  */
 export class NumericValue {
   private intPart: bigint = BigInt(0);
-  private decimalPart: string = '0'; // Store as string to maintain precision
+  private decimalPart: Decimal = new Decimal(0);
   private isNegative: boolean = false;
   private wasDecimal: boolean = false; // Track if the original value was a Decimal
 
   constructor(value: number | bigint | Decimal | string) {
     if (value instanceof Decimal) {
-      // Convert Decimal to string and parse
-      const str = value.toString();
-      this.parseFromString(str);
-      this.wasDecimal = true; // Mark that this was originally a Decimal
+      // Convert Decimal directly
+      this.wasDecimal = true;
+      this.isNegative = value.isNegative();
+      const absValue = value.abs();
+      this.intPart = BigInt(absValue.floor().toString());
+      const decimalPartValue = absValue.minus(absValue.floor());
+      this.decimalPart = decimalPartValue;
     } else if (typeof value === 'bigint') {
-      this.intPart = value < 0 ? -value : value;
-      this.decimalPart = '0';
-      this.isNegative = value < 0;
+      this.wasDecimal = false;
+      this.isNegative = value < BigInt(0);
+      this.intPart = value < BigInt(0) ? -value : value;
+      this.decimalPart = new Decimal(0);
     } else if (typeof value === 'number') {
+      this.wasDecimal = false;
       this.parseFromString(value.toString());
     } else {
+      this.wasDecimal = false;
       this.parseFromString(value);
     }
   }
@@ -59,7 +65,12 @@ export class NumericValue {
 
     const parts = absStr.split('.');
     this.intPart = parts[0] ? BigInt(parts[0]) : BigInt(0);
-    this.decimalPart = parts[1] || '0';
+
+    if (parts[1]) {
+      this.decimalPart = new Decimal(`0.${parts[1]}`);
+    } else {
+      this.decimalPart = new Decimal(0);
+    }
   }
 
   /**
@@ -70,17 +81,10 @@ export class NumericValue {
   }
 
   /**
-   * Get the decimal part as string (without leading '0.')
-   */
-  getDecimalPart(): string {
-    return this.decimalPart;
-  }
-
-  /**
    * Check if the value has a decimal part
    */
   hasDecimalPart(): boolean {
-    return this.decimalPart !== '0' && this.decimalPart !== '';
+    return !this.decimalPart.isZero();
   }
 
   /**
@@ -88,10 +92,23 @@ export class NumericValue {
    */
   toDecimal(): Decimal {
     const sign = this.isNegative ? '-' : '';
-    const dec = this.decimalPart !== '0' && this.decimalPart !== ''
-      ? `.${this.decimalPart}`
-      : '';
-    return new Decimal(`${sign}${this.intPart}${dec}`);
+    const intStr = this.intPart.toString();
+    const decStr = this.decimalPart.toString();
+
+    if (this.decimalPart.isZero()) {
+      return new Decimal(`${sign}${intStr}`);
+    }
+
+    // decStr is like "0.123", we want just ".123"
+    const decimalOnly = decStr.startsWith('0.') ? decStr.slice(1) : `.${decStr}`;
+    return new Decimal(`${sign}${intStr}${decimalOnly}`);
+  }
+
+  /**
+   * Convert to BigInt (truncates decimal part)
+   */
+  toBigInt(): bigint {
+    return this.getIntPart();
   }
 
   /**
@@ -105,11 +122,7 @@ export class NumericValue {
    * Convert to string representation
    */
   toString(): string {
-    const sign = this.isNegative ? '-' : '';
-    const dec = this.decimalPart !== '0' && this.decimalPart !== ''
-      ? `.${this.decimalPart}`
-      : '';
-    return `${sign}${this.intPart}${dec}`;
+    return this.toDecimal().toString();
   }
 
   /**

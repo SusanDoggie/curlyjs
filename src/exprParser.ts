@@ -598,13 +598,12 @@ export function parseExpression(expr: string): ExprNode {
     return createLiteralNode('');
   }
   
-  // Quick path for simple literals
+  // Quick path for simple literals (only for cases that can't contain operators)
   if (expr === 'true') return createLiteralNode(true);
   if (expr === 'false') return createLiteralNode(false);
-  if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
-    return createLiteralNode(parseStringLiteral(expr));
-  }
-  if (!isNaN(Number(expr)) && expr !== '') {
+  // Removed greedy string literal check - let tokenizer handle all string cases
+  if (!isNaN(Number(expr)) && expr !== '' && !/[+\-*/%&|^<>!~()[\],]/.test(expr)) {
+  // Only use quick path if there are no operators or special characters
     return createLiteralNode(parseNumber(expr));
   }
   if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(expr)) {

@@ -55,9 +55,8 @@ function performArithmetic(
 ): any {
   // Special handling for + operator: preserve string concatenation
   if (op === '+') {
-    // If either operand is a string (but NOT a Decimal or BigInt), use string concatenation
-    if ((typeof left === 'string' && !isDecimal(left)) ||
-      (typeof right === 'string' && !isDecimal(right))) {
+    // If either operand is a string, use string concatenation
+    if (typeof left === 'string' || typeof right === 'string') {
       return String(left) + String(right);
     }
   }
@@ -151,41 +150,41 @@ function performComparison(
   right: any,
   op: '>' | '<' | '>=' | '<='
 ): boolean {
-  const leftDecimal = toDecimal(left);
-  const rightDecimal = toDecimal(right);
-
-  // If both can be converted to Decimal, use Decimal comparison
-  if (leftDecimal !== null && rightDecimal !== null) {
+  // Priority 1: Both are BigInt - use direct BigInt comparison
+  if (typeof left === 'bigint' && typeof right === 'bigint') {
     switch (op) {
       case '>':
-        return leftDecimal.greaterThan(rightDecimal);
+        return left > right;
       case '<':
-        return leftDecimal.lessThan(rightDecimal);
+        return left < right;
       case '>=':
-        return leftDecimal.greaterThanOrEqualTo(rightDecimal);
+        return left >= right;
       case '<=':
-        return leftDecimal.lessThanOrEqualTo(rightDecimal);
+        return left <= right;
     }
   }
 
-  // Handle BigInt comparison
-  if (typeof left === 'bigint' || typeof right === 'bigint') {
-    const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
-    const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+  // Priority 2: Either is Decimal or BigInt - use Decimal comparison for precision
+  if (left instanceof Decimal || right instanceof Decimal ||
+    typeof left === 'bigint' || typeof right === 'bigint') {
+    const leftDecimal = toDecimal(left);
+    const rightDecimal = toDecimal(right);
 
-    switch (op) {
-      case '>':
-        return leftBigInt > rightBigInt;
-      case '<':
-        return leftBigInt < rightBigInt;
-      case '>=':
-        return leftBigInt >= rightBigInt;
-      case '<=':
-        return leftBigInt <= rightBigInt;
+    if (leftDecimal !== null && rightDecimal !== null) {
+      switch (op) {
+        case '>':
+          return leftDecimal.greaterThan(rightDecimal);
+        case '<':
+          return leftDecimal.lessThan(rightDecimal);
+        case '>=':
+          return leftDecimal.greaterThanOrEqualTo(rightDecimal);
+        case '<=':
+          return leftDecimal.lessThanOrEqualTo(rightDecimal);
+      }
     }
   }
 
-  // Fall back to regular JavaScript comparison
+  // Priority 3: Fall back to regular JavaScript comparison
   switch (op) {
     case '>':
       return left > right;

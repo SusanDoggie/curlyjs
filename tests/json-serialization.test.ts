@@ -761,5 +761,55 @@ describe('Template JSON serialization', () => {
       expect(restored2.render(data)).toBe(original.render(data));
       expect(JSON.stringify(json2)).toBe(JSON.stringify(json1));
     });
+
+    test('should handle string literal expressions with operators', () => {
+      const original = new Template("{{ '0.1' + '0.2' }}");
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe('0.10.2');
+      expect(restored.render({})).toBe(original.render({}));
+    });
+
+    test('should handle string concatenation with mixed types', () => {
+      const original = new Template("{{ 'value:' + a }}");
+      const data = { a: 123 };
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render(data)).toBe('value:123');
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should handle BigInt comparisons', () => {
+      const original = new Template("{{ a > b }}");
+      const data = { a: BigInt(5), b: BigInt(3) };
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render(data)).toBe('true');
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should handle Decimal comparisons', () => {
+      const original = new Template("{{ a < b }}");
+      const data = { a: new Decimal('0.1'), b: new Decimal('0.2') };
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render(data)).toBe('true');
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should handle mixed BigInt and Decimal arithmetic', () => {
+      const original = new Template("{{ a + b }}");
+      const data = { a: BigInt(5), b: new Decimal('3.5') };
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render(data)).toBe('8.5');
+      expect(restored.render(data)).toBe(original.render(data));
+    });
   });
 });
+
