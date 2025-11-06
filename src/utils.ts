@@ -23,38 +23,131 @@
 //  THE SOFTWARE.
 //
 
+import Decimal from 'decimal.js';
+
+/**
+ * NumericValue is a helper class for storing and manipulating numeric values
+ * with high precision. It splits numbers into integer and decimal parts to
+ * maintain precision during calculations.
+ */
+export class NumericValue {
+  private intPart: bigint = BigInt(0);
+  private decimalPart: string = '0'; // Store as string to maintain precision
+  private isNegative: boolean = false;
+
+  constructor(value: number | bigint | Decimal | string) {
+    if (value instanceof Decimal) {
+      // Convert Decimal to string and parse
+      const str = value.toString();
+      this.parseFromString(str);
+    } else if (typeof value === 'bigint') {
+      this.intPart = value < 0 ? -value : value;
+      this.decimalPart = '0';
+      this.isNegative = value < 0;
+    } else if (typeof value === 'number') {
+      this.parseFromString(value.toString());
+    } else {
+      this.parseFromString(value);
+    }
+  }
+
+  private parseFromString(str: string) {
+    this.isNegative = str.startsWith('-');
+    const absStr = this.isNegative ? str.slice(1) : str;
+
+    const parts = absStr.split('.');
+    this.intPart = parts[0] ? BigInt(parts[0]) : BigInt(0);
+    this.decimalPart = parts[1] || '0';
+  }
+
+  /**
+   * Get the integer part as BigInt
+   */
+  getIntPart(): bigint {
+    return this.isNegative ? -this.intPart : this.intPart;
+  }
+
+  /**
+   * Get the decimal part as string (without leading '0.')
+   */
+  getDecimalPart(): string {
+    return this.decimalPart;
+  }
+
+  /**
+   * Check if the value has a decimal part
+   */
+  hasDecimalPart(): boolean {
+    return this.decimalPart !== '0' && this.decimalPart !== '';
+  }
+
+  /**
+   * Convert to Decimal for precise calculations
+   */
+  toDecimal(): Decimal {
+    const sign = this.isNegative ? '-' : '';
+    const dec = this.decimalPart !== '0' && this.decimalPart !== ''
+      ? `.${this.decimalPart}`
+      : '';
+    return new Decimal(`${sign}${this.intPart}${dec}`);
+  }
+
+  /**
+   * Convert to number (may lose precision)
+   */
+  toNumber(): number {
+    return Number(this.toString());
+  }
+
+  /**
+   * Convert to string representation
+   */
+  toString(): string {
+    const sign = this.isNegative ? '-' : '';
+    const dec = this.decimalPart !== '0' && this.decimalPart !== ''
+      ? `.${this.decimalPart}`
+      : '';
+    return `${sign}${this.intPart}${dec}`;
+  }
+
+  /**
+   * Check if this is an integer (no decimal part)
+   */
+  isInteger(): boolean {
+    return !this.hasDecimalPart();
+  }
+}
+
 /**
  * Parse a number string intelligently:
  * - Use BigInt for large integers outside safe integer range
- * - Use Number for regular numbers
+ * - Use Decimal for numbers with decimal points (for precision)
+ * - Use Number for safe integers
  * 
  * @param str - The string representation of the number
- * @returns A number or bigint depending on the magnitude
+ * @returns A number, bigint, or Decimal depending on the value
  */
-export function parseNumber(str: string): number | bigint {
-  // Check if it looks like an integer (no decimal point, no scientific notation)
-  if (!str.includes('.') && !str.toLowerCase().includes('e')) {
-    // Try to detect if it's a large integer before converting to Number
-    // If the string has more than 15 digits, it's likely beyond safe integer range
-    const isNegative = str.startsWith('-');
-    const absStr = isNegative ? str.slice(1) : str;
-    
-    // Numbers with more than 15 digits are definitely beyond MAX_SAFE_INTEGER
-    // Use BigInt directly to avoid precision loss
-    if (absStr.length > 15) {
-      try {
-        return BigInt(str);
-      } catch {
-        // If BigInt parsing fails, fall back to Number
-        return Number(str);
-      }
-    }
-    
-    // For numbers with 15 or fewer digits, it's safe to use Number
-    // since they won't lose precision
-    return Number(str);
+export function parseNumber(str: string): number | bigint | Decimal {
+  // Check if it has a decimal point or scientific notation
+  if (str.includes('.') || str.toLowerCase().includes('e')) {
+    // Use Decimal for precision with decimal numbers
+    return new Decimal(str);
   }
-  
-  // For decimals and scientific notation, use Number
+
+  // Integer: detect if it's a large integer
+  const isNegative = str.startsWith('-');
+  const absStr = isNegative ? str.slice(1) : str;
+
+  // Numbers with more than 15 digits use BigInt to avoid precision loss
+  if (absStr.length > 15) {
+    try {
+      return BigInt(str);
+    } catch {
+      // If BigInt parsing fails, fall back to Number
+      return Number(str);
+    }
+  }
+
+  // For numbers with 15 or fewer digits, use regular Number
   return Number(str);
 }

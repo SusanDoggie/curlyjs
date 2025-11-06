@@ -32,12 +32,23 @@ import { OPERATORS } from './exprParser';
 
 function reconstructExpression(expr: ExprNode): string {
   switch (expr.type) {
-    case 'literal':
-      if (typeof expr.value === 'string') {
-        return `"${expr.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-      } else if (Array.isArray(expr.value)) {
+    case 'literal': {
+      const litNode = expr as any;
+
+      // Handle different data types
+      if (litNode.dataType === 'string') {
+        return `"${(litNode.value as string).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+      } else if (litNode.dataType === 'bigint' || litNode.dataType === 'decimal') {
+        // BigInt and Decimal are stored as strings in AST
+        return litNode.value as string;
+      } else if (litNode.dataType === 'boolean') {
+        return String(litNode.value);
+      } else if (litNode.dataType === 'number') {
+        return String(litNode.value);
+      } else if (litNode.dataType === 'array') {
         // Array elements can be ExprNode objects or primitive values
-        return `[${expr.value.map(v => {
+        const arr = litNode.value as ExprNode[];
+        return `[${arr.map(v => {
           if (v && typeof v === 'object' && 'type' in v) {
             // It's an ExprNode
             return reconstructExpression(v as ExprNode);
@@ -48,7 +59,23 @@ function reconstructExpression(expr: ExprNode): string {
           }
         }).join(', ')}]`;
       }
-      return String(expr.value);
+
+      // Fallback for old format without dataType
+      if (typeof litNode.value === 'string') {
+        return `"${litNode.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+      } else if (Array.isArray(litNode.value)) {
+        return `[${litNode.value.map((v: any) => {
+          if (v && typeof v === 'object' && 'type' in v) {
+            return reconstructExpression(v as ExprNode);
+          } else if (typeof v === 'string') {
+            return `"${v}"`;
+          } else {
+            return String(v);
+          }
+        }).join(', ')}]`;
+      }
+      return String(litNode.value);
+    }
     case 'variable':
       return expr.name;
     case 'memberAccess':

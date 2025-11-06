@@ -275,18 +275,31 @@ function performComparison(
 // Evaluate an expression AST node
 export function evalExprNode(node: ExprNode, data: TemplateData, methods: TemplateMethods): any {
   switch (node.type) {
-    case 'literal':
-      // For array literals that contain expression nodes, we need to evaluate them
-      if (Array.isArray(node.value)) {
-        return node.value.map(item => {
-          // Check if item is an expression node
-          if (typeof item === 'object' && item !== null && 'type' in item) {
-            return evalExprNode(item as ExprNode, data, methods);
-          }
-          return item;
-        });
+    case 'literal': {
+      const litNode = node as any;
+
+      // Deserialize based on dataType
+      if (litNode.dataType === 'bigint') {
+        return BigInt(litNode.value as string);
+      } else if (litNode.dataType === 'decimal') {
+        return new Decimal(litNode.value as string);
+      } else if (litNode.dataType === 'array') {
+    // For array literals that contain expression nodes, we need to evaluate them
+        if (Array.isArray(litNode.value)) {
+          return litNode.value.map((item: any) => {
+            // Check if item is an expression node
+            if (typeof item === 'object' && item !== null && 'type' in item) {
+              return evalExprNode(item as ExprNode, data, methods);
+            }
+            return item;
+          });
+        }
+        return litNode.value;
       }
-      return node.value;
+
+      // For string, number, boolean - return as-is
+      return litNode.value;
+    }
 
     case 'variable':
       const value = _.get(data, node.name);

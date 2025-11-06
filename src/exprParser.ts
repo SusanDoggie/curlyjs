@@ -25,6 +25,7 @@
 
 import type { ExprNode, LiteralNode, VariableNode, BinaryOpNode, UnaryOpNode, MethodCallNode, MemberAccessNode } from './ast';
 import { parseNumber } from './utils';
+import Decimal from 'decimal.js';
 
 // Operator precedence and associativity table
 // Higher precedence = evaluated first
@@ -54,7 +55,7 @@ export const OPERATORS: Record<string, { precedence: number; associativity: 'lef
 };
 
 type Token =
-  | { type: 'number'; value: number | bigint }
+  | { type: 'number'; value: number | bigint | Decimal }
   | { type: 'string'; value: string }
   | { type: 'boolean'; value: boolean }
   | { type: 'variable'; name: string }
@@ -67,11 +68,44 @@ type Token =
   | { type: 'comma' }
   | { type: 'method'; name: string };
 
-function createLiteralNode(value: string | number | boolean | bigint | ExprNode[]): LiteralNode {
-  return {
-    type: 'literal',
-    value
-  };
+function createLiteralNode(value: string | number | boolean | bigint | Decimal | ExprNode[]): LiteralNode {
+  if (typeof value === 'string') {
+    return {
+      type: 'literal',
+      dataType: 'string',
+      value
+    };
+  } else if (typeof value === 'boolean') {
+    return {
+      type: 'literal',
+      dataType: 'boolean',
+      value
+    };
+  } else if (typeof value === 'bigint') {
+    return {
+      type: 'literal',
+      dataType: 'bigint',
+      value: value.toString() // Store as string for JSON compatibility
+    };
+  } else if (value instanceof Decimal) {
+    return {
+      type: 'literal',
+      dataType: 'decimal',
+      value: value.toString() // Store as string for JSON compatibility and precision
+    };
+  } else if (Array.isArray(value)) {
+    return {
+      type: 'literal',
+      dataType: 'array',
+      value
+    };
+  } else {
+    return {
+      type: 'literal',
+      dataType: 'number',
+      value
+    };
+  }
 }
 
 function createVariableNode(name: string): VariableNode {

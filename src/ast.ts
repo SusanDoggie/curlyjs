@@ -28,9 +28,27 @@ export interface BaseExprNode {
   type: string;
 }
 
+/**
+ * LiteralNode represents a literal value in the AST.
+ * 
+ * The `dataType` field identifies the type of the literal:
+ * - 'string': String literal
+ * - 'number': Regular JavaScript number (safe integers and floats)
+ * - 'boolean': Boolean literal
+ * - 'bigint': Large integer stored as string for JSON compatibility
+ * - 'decimal': Decimal number stored as string for precision and JSON compatibility
+ * - 'array': Array of expression nodes
+ * 
+ * For JSON compatibility and numerical precision:
+ * - BigInt values are stored as strings (e.g., "999999999999999999")
+ * - Decimal values are stored as strings (e.g., "0.1")
+ * - Regular numbers remain as numbers
+ * - Arrays contain ExprNode objects
+ */
 export interface LiteralNode extends BaseExprNode {
   type: 'literal';
-  value: string | number | boolean | bigint | ExprNode[];
+  dataType: 'string' | 'number' | 'boolean' | 'bigint' | 'decimal' | 'array';
+  value: string | number | boolean | ExprNode[];
 }
 
 export interface VariableNode extends BaseExprNode {
