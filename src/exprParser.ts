@@ -67,7 +67,7 @@ type Token =
   | { type: 'comma' }
   | { type: 'method'; name: string };
 
-function createLiteralNode(value: string | number | boolean | bigint | any[]): LiteralNode {
+function createLiteralNode(value: string | number | boolean | bigint | ExprNode[]): LiteralNode {
   return {
     type: 'literal',
     value
