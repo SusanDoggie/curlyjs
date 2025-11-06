@@ -60,21 +60,8 @@ function reconstructExpression(expr: ExprNode): string {
         }).join(', ')}]`;
       }
 
-      // Fallback for old format without dataType
-      if (typeof litNode.value === 'string') {
-        return `"${litNode.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-      } else if (Array.isArray(litNode.value)) {
-        return `[${litNode.value.map((v: any) => {
-          if (v && typeof v === 'object' && 'type' in v) {
-            return reconstructExpression(v as ExprNode);
-          } else if (typeof v === 'string') {
-            return `"${v}"`;
-          } else {
-            return String(v);
-          }
-        }).join(', ')}]`;
-      }
-      return String(litNode.value);
+      // No fallback - throw error for invalid AST format
+      throw new Error(`Invalid literal node: missing or unknown dataType '${litNode.dataType}'`);
     }
     case 'variable':
       return expr.name;
