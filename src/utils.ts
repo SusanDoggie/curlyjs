@@ -34,12 +34,14 @@ export class NumericValue {
   private intPart: bigint = BigInt(0);
   private decimalPart: string = '0'; // Store as string to maintain precision
   private isNegative: boolean = false;
+  private wasDecimal: boolean = false; // Track if the original value was a Decimal
 
   constructor(value: number | bigint | Decimal | string) {
     if (value instanceof Decimal) {
       // Convert Decimal to string and parse
       const str = value.toString();
       this.parseFromString(str);
+      this.wasDecimal = true; // Mark that this was originally a Decimal
     } else if (typeof value === 'bigint') {
       this.intPart = value < 0 ? -value : value;
       this.decimalPart = '0';
@@ -115,6 +117,60 @@ export class NumericValue {
    */
   isInteger(): boolean {
     return !this.hasDecimalPart();
+  }
+
+  /**
+   * Perform arithmetic operations with another NumericValue
+   * Returns the appropriate type: BigInt for integer results, Decimal for non-integer results
+   */
+  add(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().plus(other.toDecimal());
+    }
+    return this.getIntPart() + other.getIntPart();
+  }
+
+  subtract(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().minus(other.toDecimal());
+    }
+    return this.getIntPart() - other.getIntPart();
+  }
+
+  multiply(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().times(other.toDecimal());
+    }
+    return this.getIntPart() * other.getIntPart();
+  }
+
+  divide(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().dividedBy(other.toDecimal());
+    }
+
+    // For BigInt integer division, use JavaScript's default integer division behavior
+    return this.getIntPart() / other.getIntPart();
+  }
+
+  modulo(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().modulo(other.toDecimal());
+    }
+    return this.getIntPart() % other.getIntPart();
+  }
+
+  power(other: NumericValue): bigint | Decimal {
+    // If either was originally a Decimal, use Decimal arithmetic
+    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
+      return this.toDecimal().pow(other.toDecimal());
+    }
+    return this.getIntPart() ** other.getIntPart();
   }
 }
 

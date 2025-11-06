@@ -27,7 +27,7 @@ import _ from 'lodash';
 import Decimal from 'decimal.js';
 import type { TemplateData, TemplateMethods } from './types';
 import type { ExprNode } from './ast';
-import { parseNumber } from './utils';
+import { parseNumber, NumericValue } from './utils';
 
 // Helper to check if a value is a Decimal instance
 function isDecimal(value: any): value is Decimal {
@@ -37,9 +37,9 @@ function isDecimal(value: any): value is Decimal {
 // Helper to convert value to Decimal if it's a number or Decimal
 function toDecimal(value: any): Decimal | null {
   if (isDecimal(value)) return value;
-  if (typeof value === 'number' || typeof value === 'string') {
+  if (typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint') {
     try {
-      return new Decimal(value);
+      return new Decimal(value.toString());
     } catch {
       return null;
     }
@@ -62,107 +62,35 @@ function performArithmetic(
     }
   }
 
-  // Handle mixed BigInt and Decimal: convert to Decimal for precision
-  // Check if one operand is BigInt and the other is Decimal or a non-integer Number
-  if ((typeof left === 'bigint' || typeof right === 'bigint') &&
-    (isDecimal(left) || isDecimal(right) ||
-      (typeof left === 'number' && !Number.isInteger(left)) ||
-      (typeof right === 'number' && !Number.isInteger(right)))) {
-    const leftDecimal = isDecimal(left) ? left : new Decimal(left.toString());
-    const rightDecimal = isDecimal(right) ? right : new Decimal(right.toString());
+  // Use NumericValue for precise calculations ONLY when we have BigInt or Decimal
+  // This preserves regular JavaScript number behavior for normal numbers
+  const hasPreciseType = (val: any) => typeof val === 'bigint' || val instanceof Decimal;
 
-    switch (op) {
-      case '+':
-        return leftDecimal.plus(rightDecimal);
-      case '-':
-        return leftDecimal.minus(rightDecimal);
-      case '*':
-        return leftDecimal.times(rightDecimal);
-      case '/':
-        return leftDecimal.dividedBy(rightDecimal);
-      case '%':
-        return leftDecimal.modulo(rightDecimal);
-      case '**':
-        return leftDecimal.pow(rightDecimal);
-    }
-  }
-
-  // Handle BigInt arithmetic to preserve precision for large integers
-  // Only if both operands are integers (BigInt or integer Numbers)
-  if (typeof left === 'bigint' || typeof right === 'bigint') {
-    // Check if both are integers before converting to BigInt
-    const leftIsInt = typeof left === 'bigint' || Number.isInteger(left);
-    const rightIsInt = typeof right === 'bigint' || Number.isInteger(right);
-
-    if (leftIsInt && rightIsInt) {
-      const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
-      const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+  if (hasPreciseType(left) || hasPreciseType(right)) {
+    try {
+      const leftNum = new NumericValue(left);
+      const rightNum = new NumericValue(right);
 
       switch (op) {
         case '+':
-          return leftBigInt + rightBigInt;
+          return leftNum.add(rightNum);
         case '-':
-          return leftBigInt - rightBigInt;
+          return leftNum.subtract(rightNum);
         case '*':
-          return leftBigInt * rightBigInt;
+          return leftNum.multiply(rightNum);
         case '/':
-          return leftBigInt / rightBigInt;
+          return leftNum.divide(rightNum);
         case '%':
-          return leftBigInt % rightBigInt;
+          return leftNum.modulo(rightNum);
         case '**':
-          return leftBigInt ** rightBigInt;
+          return leftNum.power(rightNum);
       }
+    } catch {
+      // Fall through to legacy arithmetic if NumericValue fails
     }
   }
 
-  const leftDecimal = toDecimal(left);
-  const rightDecimal = toDecimal(right);
-
-  // If both can be converted to Decimal, use Decimal arithmetic
-  if (leftDecimal !== null && rightDecimal !== null) {
-    switch (op) {
-      case '+':
-        return leftDecimal.plus(rightDecimal);
-      case '-':
-        return leftDecimal.minus(rightDecimal);
-      case '*':
-        return leftDecimal.times(rightDecimal);
-      case '/':
-        return leftDecimal.dividedBy(rightDecimal);
-      case '%':
-        return leftDecimal.modulo(rightDecimal);
-      case '**':
-        return leftDecimal.pow(rightDecimal);
-    }
-  }
-
-  // Pre-emptive BigInt check for operations likely to overflow
-  // If both operands are integers and large enough that multiplication might overflow
-  if (Number.isInteger(left) && Number.isInteger(right)) {
-    const absLeft = Math.abs(left);
-    const absRight = Math.abs(right);
-
-    // Check if multiplication or exponentiation might overflow
-    // Use BigInt if operands are large enough
-    if ((op === '*' && absLeft > 1000000 && absRight > 1000000) ||
-      (op === '**' && absLeft > 1000 && absRight > 2)) {
-      try {
-        const leftBigInt = BigInt(left);
-        const rightBigInt = BigInt(right);
-
-        switch (op) {
-          case '*':
-            return leftBigInt * rightBigInt;
-          case '**':
-            return leftBigInt ** rightBigInt;
-        }
-      } catch {
-        // Fall through to regular arithmetic
-      }
-    }
-  }
-
-  // Fall back to regular JavaScript arithmetic with overflow detection
+  // Regular JavaScript arithmetic for normal numbers
   let result: number;
   switch (op) {
     case '+':
@@ -217,9 +145,7 @@ function performArithmetic(
   }
 
   return result;
-}
-
-// Helper to perform comparison operations with Decimal and BigInt support
+}// Helper to perform comparison operations with Decimal and BigInt support
 function performComparison(
   left: any,
   right: any,
@@ -356,17 +282,28 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
         case '**':
           return performArithmetic(leftVal, rightVal, node.operator);
         case '&':
-          return leftVal & rightVal;
         case '|':
-          return leftVal | rightVal;
         case '^':
-          return leftVal ^ rightVal;
         case '<<':
-          return leftVal << rightVal;
         case '>>':
-          return leftVal >> rightVal;
         case '>>>':
-          return leftVal >>> rightVal;
+          // Bitwise operators require Number type, convert BigInt to Number
+          const leftNum = typeof leftVal === 'bigint' ? Number(leftVal) : leftVal;
+          const rightNum = typeof rightVal === 'bigint' ? Number(rightVal) : rightVal;
+          switch (node.operator) {
+            case '&':
+              return leftNum & rightNum;
+            case '|':
+              return leftNum | rightNum;
+            case '^':
+              return leftNum ^ rightNum;
+            case '<<':
+              return leftNum << rightNum;
+            case '>>':
+              return leftNum >> rightNum;
+            case '>>>':
+              return leftNum >>> rightNum;
+          }
       }
       break;
 
@@ -384,7 +321,19 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
       const method = methods[node.methodName];
       if (!method) return '';
 
-      const evalArgs = node.args.map(arg => evalExprNode(arg, data, methods));
+      const evalArgs = node.args.map(arg => {
+        const val = evalExprNode(arg, data, methods);
+        // Convert BigInt to Number for method arguments to avoid "Cannot convert BigInt" errors
+        // Most JavaScript methods expect Number, not BigInt
+        if (typeof val === 'bigint') {
+          // Only convert if the value fits in a safe integer range
+          const num = Number(val);
+          if (Number.isSafeInteger(num)) {
+            return num;
+          }
+        }
+        return val;
+      });
       return method(...evalArgs);
   }
 

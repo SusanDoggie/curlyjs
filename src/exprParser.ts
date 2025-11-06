@@ -216,8 +216,34 @@ function tokenize(expr: string): Token[] {
       continue;
     }
 
-    // Numbers
-    if (/\d/.test(char) || (char === '.' && i + 1 < expr.length && /\d/.test(expr[i + 1]))) {
+    // Numbers (including negative numbers in unary position)
+    if (/\d/.test(char) || (char === '.' && i + 1 < expr.length && /\d/.test(expr[i + 1])) ||
+      (char === '-' && i + 1 < expr.length && /\d/.test(expr[i + 1]))) {
+
+      // Check if minus is in unary position
+      if (char === '-') {
+        const prevToken = tokens[tokens.length - 1];
+        const isUnary = !prevToken ||
+          prevToken.type === 'operator' ||
+          prevToken.type === 'unary' ||
+          prevToken.type === 'lparen' ||
+          prevToken.type === 'lbracket' ||
+          prevToken.type === 'comma';
+
+        // Only treat as negative number if in unary position
+        if (isUnary) {
+          let num = '-';
+          i++; // Skip the minus
+          while (i < expr.length && /[\d.]/.test(expr[i])) {
+            num += expr[i];
+            i++;
+          }
+          tokens.push({ type: 'number', value: parseNumber(num) });
+          continue;
+        }
+      }
+
+    // Regular positive number
       let num = '';
       while (i < expr.length && /[\d.]/.test(expr[i])) {
         num += expr[i];
@@ -247,21 +273,7 @@ function tokenize(expr: string): Token[] {
 
     // Single-character operators
     if ('+-*/%&|^<>'.includes(char)) {
-      // Check if it's a unary operator
-      const prevToken = tokens[tokens.length - 1];
-      const isUnary = !prevToken ||
-        prevToken.type === 'operator' ||
-        prevToken.type === 'unary' ||
-        prevToken.type === 'lparen' ||
-        prevToken.type === 'comma';
-
-      if ((char === '-' || char === '+') && isUnary) {
-        // Treat as unary minus/plus, but we'll handle minus by negating the next number
-        // For now, we'll parse it as binary and handle in a later pass if needed
-        tokens.push({ type: 'operator', operator: char });
-      } else {
-        tokens.push({ type: 'operator', operator: char });
-      }
+      tokens.push({ type: 'operator', operator: char });
       i++;
       continue;
     }

@@ -655,53 +655,44 @@ describe('Decimal and BigInt Support', () => {
     });
   });
 
-  describe('Parser limitations with unary minus', () => {
-    // These tests document a known parser bug where unary minus before binary minus
-    // causes parsing ambiguity. The parser cannot distinguish between:
-    // - Unary minus on first operand: (-x) - y
-    // - Binary minus with negative literal: -(x - y)
-    // Workaround: Use 0 - x - y or parentheses
-
-    test('KNOWN BUG: unary minus before binary minus returns empty string', () => {
+  describe('Unary minus operator', () => {
+    test('should handle unary minus before binary minus', () => {
       const template = new Template('{{ -1 - 2 }}');
       const result = template.render({});
-      // BUG: Returns empty string instead of -3
       expect(result).toBe('-3');
     });
 
-    test('KNOWN BUG: unary minus before subtraction with large numbers', () => {
+    test('should handle unary minus before subtraction with large numbers', () => {
       const template = new Template('{{ -9007199254740991 - 9007199254740991 }}');
       const result = template.render({});
-      // BUG: Returns empty string instead of -18014398509481982
       expect(result).toBe('-18014398509481982');
     });
 
-    test('KNOWN BUG: parentheses do not help with unary minus before binary minus', () => {
+    test('should handle parentheses with unary minus before binary minus', () => {
       const template = new Template('{{ (-1) - 2 }}');
       const result = template.render({});
-      // BUG: Even with parentheses, returns empty string
       expect(result).toBe('-3');
     });
 
-    test('WORKAROUND: use 0 - x - y instead of -x - y', () => {
+    test('should handle 0 - x - y pattern', () => {
       const template = new Template('{{ 0 - 1 - 2 }}');
       const result = template.render({});
       expect(result).toBe('-3');
     });
 
-    test('WORKAROUND: use variables for negative values', () => {
+    test('should handle variables with negative values', () => {
       const template = new Template('{{ x - 2 }}');
       const result = template.render({ x: -1 });
       expect(result).toBe('-3');
     });
 
-    test('unary minus alone works correctly', () => {
+    test('should handle unary minus alone', () => {
       const template = new Template('{{ -5 }}');
       const result = template.render({});
       expect(result).toBe('-5');
     });
 
-    test('binary minus alone works correctly', () => {
+    test('should handle binary minus alone', () => {
       const template = new Template('{{ 3 - 5 }}');
       const result = template.render({});
       expect(result).toBe('-2');
