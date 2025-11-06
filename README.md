@@ -12,11 +12,12 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 - � **Array Indexing** - Access array elements with bracket notation using literal or variable indices (`items[0]`, `items[index]`)
 - �💬 **Comments** - Template comments with `{# ... #}` syntax
 - 📊 **Operators** - Rich operator support including arithmetic (`+`, `-`, `*`, `/`, `%`, `**`), comparison, logical (`&&`, `||`, `!`), and bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`, `>>>`)
-- 🔧 **Custom Methods** - Extend templates with custom functions and method calls in loops
+- 🔧 **Custom Methods** - Extend templates with custom functions; methods receive standard JavaScript types (no need to handle `BigInt` or `Decimal`)
 - 🌳 **Nested Structures** - Support for deeply nested objects and arrays
 - 📝 **Variable & Method Extraction** - Automatically detect variables and methods used in templates
 - 💾 **Serialization** - Serialize templates to JSON and reconstruct them for caching and storage
 - ⚡ **AST-based** - Efficient parsing and rendering via Abstract Syntax Tree
+- 🎯 **High Precision** - Internal support for `BigInt` and `Decimal` for precise calculations
 
 ## Installation
 
@@ -461,6 +462,52 @@ Methods support various argument types:
 - **String literals**: `{{ upper("hello") }}`
 - **Array literals**: `{{ join(["a", "b"], "-") }}`
 - **Nested calls**: `{{ upper(lower("MIXED")) }}`
+
+#### Method Argument Type Normalization
+
+**Important:** User-provided methods receive only standard JavaScript types. All special types are automatically converted at the method boundary:
+
+- **`BigInt` → `Number`**: Converted to standard number (may lose precision for very large values)
+- **`Decimal` → `Number`**: Converted to standard number (may lose precision for high-precision decimals)
+- **Other types**: Passed as-is (string, number, boolean, array, object, null)
+
+This ensures you don't need to handle special types in your method implementations:
+
+```typescript
+import Decimal from 'decimal.js';
+
+const template = new Template('{{ formatPrice(price) }}');
+
+const methods = {
+  // Method receives a standard Number, not a Decimal instance
+  formatPrice: (val) => {
+    // val is always a number, never a BigInt or Decimal
+    return `$${val.toFixed(2)}`;
+  }
+};
+
+// Even though we pass a Decimal, the method receives a Number
+template.render(
+  { price: new Decimal('19.99') }, 
+  methods
+); // "$19.99"
+```
+
+**Note:** Methods can still *return* `BigInt` or `Decimal` values, which will maintain precision in subsequent template calculations:
+
+```typescript
+const template = new Template('{{ calculate(a, b) + c }}');
+
+const methods = {
+  // Receives standard Numbers, returns Decimal for precise calculation
+  calculate: (a, b) => new Decimal(a).plus(new Decimal(b))
+};
+
+template.render({
+  a: new Decimal('10.1'),
+  b: new Decimal('20.2'), 
+  c: new Decimal('5.3')
+}, methods); // "35.6" (precise calculation maintained)
 
 ### Escape Sequences
 
