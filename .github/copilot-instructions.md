@@ -97,6 +97,13 @@ yarn clean               # Remove dist/
 ### Numerical Precision
 **CRITICAL:** Always preserve numerical precision when possible:
 - **BigInt and Decimal.js support**: Use `BigInt` for large integers, `Decimal.js` for precise decimal calculations
+- **Literal numbers in templates**: When parsing numeric literals directly in template expressions, preserve precision:
+  - **Integer literals**: Use regular JavaScript `number` for safe integers (within `Number.MIN_SAFE_INTEGER` to `Number.MAX_SAFE_INTEGER`)
+  - **Large integer literals**: Automatically convert to `BigInt` for integers outside the safe integer range
+  - **Decimal literals**: Automatically convert to `Decimal` for numbers with decimal points to avoid floating-point precision loss
+  - Example: `{{ 0.1 + 0.2 }}` should parse `0.1` and `0.2` as `Decimal` instances, resulting in exact `0.3` (not `0.30000000000000004`)
+  - Example: `{{ 9007199254740992 }}` (beyond safe integer) should parse as `BigInt`
+  - Example: `{{ 42 }}` (safe integer) can remain as regular `number`
 - **Mixed-type calculations**: When mixing `int`/`BigInt`/`Decimal` types, preserve all precision if possible
   - Example: `BigInt(5) + BigInt(3)` → `BigInt(8)` (maintain BigInt)
   - Example: `Decimal('0.1') + Decimal('0.2')` → `Decimal('0.3')` (maintain Decimal precision)
