@@ -403,6 +403,158 @@ describe('Template JSON serialization', () => {
       expect(restored.render({})).toBe(original.render({}));
     });
 
+    test('should reconstruct a template with newline escape sequences', () => {
+      const original = new Template('{{ "Line1\\nLine2\\nLine3" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with tab escape sequences', () => {
+      const original = new Template('{{ "Col1\\tCol2\\tCol3" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with backslash escape sequences', () => {
+      const original = new Template('{{ "C:\\\\Users\\\\Documents\\\\file.txt" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe('C:\\Users\\Documents\\file.txt');
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with quote escape sequences', () => {
+      const original = new Template('{{ "She said \\"Hello\\" to me" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe('She said "Hello" to me');
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with mixed escape sequences', () => {
+      const original = new Template('{{ "Line1\\nTab:\\tPath:\\\\home\\nQuote:\\"test\\"" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with carriage return escape sequences', () => {
+      const original = new Template('{{ "Line1\\rLine2" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with form feed escape sequences', () => {
+      const original = new Template('{{ "Page1\\fPage2" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with backspace escape sequences', () => {
+      const original = new Template('{{ "Test\\bBS" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should reconstruct a template with unicode escape sequences', () => {
+      const original = new Template('{{ "Heart: \\u2764" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      // Render output should match
+      expect(restored.render({})).toBe('Heart: ❤');
+      expect(restored.render({})).toBe(original.render({}));
+
+      // Note: JSON.stringify normalizes \u2764 to the actual character ❤
+      // This is acceptable as long as the render output is identical
+      // and subsequent round-trips are stable
+      const json2 = restored.toJSON();
+      const restored2 = Template.fromJSON(json2);
+      expect(restored2.render({})).toBe(original.render({}));
+      expect(restored2.template).toBe(restored.template); // Should stabilize
+    });
+
+    test('should reconstruct a template with vertical tab escape sequences', () => {
+      const original = new Template('{{ "V1\\vV2" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      // Render output should match
+      expect(restored.render({})).toBe(original.render({}));
+
+      // Note: JSON.stringify may normalize \v to \u000b
+      // This is acceptable as long as render output is identical
+      const json2 = restored.toJSON();
+      const restored2 = Template.fromJSON(json2);
+      expect(restored2.render({})).toBe(original.render({}));
+    });
+
+    test('should reconstruct a template with hex escape sequences', () => {
+      const original = new Template('{{ "Hex: \\x41\\x42\\x43" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe('Hex: ABC');
+      expect(restored.render({})).toBe(original.render({}));
+    });
+
+    test('should handle escape sequences in for loops', () => {
+      const original = new Template('{% for line in lines %}{{ line }}\\n{% endfor %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      const data = { lines: ['Line1', 'Line2', 'Line3'] };
+      expect(restored.render(data)).toBe(original.render(data));
+    });
+
+    test('should handle escape sequences in conditionals', () => {
+      const original = new Template('{% if newline %}{{ "Line1\\nLine2" }}{% else %}{{ "NoBreak" }}{% endif %}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({ newline: true })).toBe(original.render({ newline: true }));
+      expect(restored.render({ newline: false })).toBe(original.render({ newline: false }));
+    });
+
+    test('should handle multiple escape sequences in single expression', () => {
+      const original = new Template('{{ "\\t\\n\\r\\\\\\"" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe(original.render({}));
+      expect(restored.template).toBe(original.template);
+    });
+
+    test('should handle escape sequences with string concatenation', () => {
+      const original = new Template('{{ "Hello\\n" + "World\\n" }}');
+      const json = original.toJSON();
+      const restored = Template.fromJSON(json);
+
+      expect(restored.render({})).toBe('Hello\nWorld\n');
+      expect(restored.render({})).toBe(original.render({}));
+    });
+
     test('should reconstruct an empty template', () => {
       const original = new Template('');
       const json = original.toJSON();
