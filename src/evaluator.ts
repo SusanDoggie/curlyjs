@@ -29,164 +29,25 @@ import type { TemplateData, TemplateMethods } from './types';
 import type { ExprNode } from './ast';
 
 /**
- * NumericValue is a helper class for storing and manipulating numeric values
- * with high precision. It uses BigInt for integer parts and Decimal for decimal parts
- * to maintain precision during calculations.
+ * Helper to convert a value to Decimal for calculations
  */
-export class NumericValue {
-  private intPart: bigint = BigInt(0);
-  private decimalPart: Decimal = new Decimal(0);
-  private isNegative: boolean = false;
-  private wasDecimal: boolean = false; // Track if the original value was a Decimal
-
-  constructor(value: number | bigint | Decimal | string) {
-    if (value instanceof Decimal) {
-      // Convert Decimal directly
-      this.wasDecimal = true;
-      this.isNegative = value.isNegative();
-      const absValue = value.abs();
-      this.intPart = BigInt(absValue.floor().toString());
-      const decimalPartValue = absValue.minus(absValue.floor());
-      this.decimalPart = decimalPartValue;
-    } else if (typeof value === 'bigint') {
-      this.wasDecimal = false;
-      this.isNegative = value < BigInt(0);
-      this.intPart = value < BigInt(0) ? -value : value;
-      this.decimalPart = new Decimal(0);
-    } else if (typeof value === 'number') {
-      this.wasDecimal = false;
-      this.parseFromString(value.toString());
-    } else {
-      this.wasDecimal = false;
-      this.parseFromString(value);
-    }
+function toDecimal(value: any): Decimal {
+  if (value instanceof Decimal) {
+    return value;
   }
-
-  private parseFromString(str: string) {
-    this.isNegative = str.startsWith('-');
-    const absStr = this.isNegative ? str.slice(1) : str;
-
-    const parts = absStr.split('.');
-    this.intPart = parts[0] ? BigInt(parts[0]) : BigInt(0);
-
-    if (parts[1]) {
-      this.decimalPart = new Decimal(`0.${parts[1]}`);
-    } else {
-      this.decimalPart = new Decimal(0);
-    }
+  if (typeof value === 'bigint') {
+    return new Decimal(value.toString());
   }
-
-  /**
-   * Get the integer part as BigInt
-   */
-  getIntPart(): bigint {
-    return this.isNegative ? -this.intPart : this.intPart;
-  }
-
-  /**
-   * Check if the value has a decimal part
-   */
-  hasDecimalPart(): boolean {
-    return !this.decimalPart.isZero();
-  }
-
-  /**
-   * Convert to Decimal for precise calculations
-   */
-  toDecimal(): Decimal {
-    const sign = this.isNegative ? '-' : '';
-    const intStr = this.intPart.toString();
-    const decStr = this.decimalPart.toString();
-
-    if (this.decimalPart.isZero()) {
-      return new Decimal(`${sign}${intStr}`);
-    }
-
-    // decStr is like "0.123", we want just ".123"
-    const decimalOnly = decStr.startsWith('0.') ? decStr.slice(1) : `.${decStr}`;
-    return new Decimal(`${sign}${intStr}${decimalOnly}`);
-  }
-
-  /**
-   * Convert to BigInt (truncates decimal part)
-   */
-  toBigInt(): bigint {
-    return this.getIntPart();
-  }
-
-  /**
-   * Convert to number (may lose precision)
-   */
-  toNumber(): number {
-    return Number(this.toString());
-  }
-
-  /**
-   * Convert to string representation
-   */
-  toString(): string {
-    return this.toDecimal().toString();
-  }
-
-  /**
-   * Check if this is an integer (no decimal part)
-   */
-  isInteger(): boolean {
-    return !this.hasDecimalPart();
-  }
-
-  /**
-   * Perform arithmetic operations with another NumericValue
-   * Returns the appropriate type: BigInt for integer results, Decimal for non-integer results
-   */
-  add(other: NumericValue): bigint | Decimal {
-    // If either was originally a Decimal, use Decimal arithmetic
-    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
-      return this.toDecimal().plus(other.toDecimal());
-    }
-    return this.getIntPart() + other.getIntPart();
-  }
-
-  subtract(other: NumericValue): bigint | Decimal {
-    // If either was originally a Decimal, use Decimal arithmetic
-    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
-      return this.toDecimal().minus(other.toDecimal());
-    }
-    return this.getIntPart() - other.getIntPart();
-  }
-
-  multiply(other: NumericValue): bigint | Decimal {
-    // If either was originally a Decimal, use Decimal arithmetic
-    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
-      return this.toDecimal().times(other.toDecimal());
-    }
-    return this.getIntPart() * other.getIntPart();
-  }
-
-  divide(other: NumericValue): bigint | Decimal {
-    // Always use Decimal division for accurate results
-    // Division should produce exact results, not truncate like integer division
-    return this.toDecimal().dividedBy(other.toDecimal());
-  }
-
-  modulo(other: NumericValue): bigint | Decimal {
-    // If either was originally a Decimal, use Decimal arithmetic
-    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
-      return this.toDecimal().modulo(other.toDecimal());
-    }
-    return this.getIntPart() % other.getIntPart();
-  }
-
-  power(other: NumericValue): bigint | Decimal {
-    // If either was originally a Decimal, use Decimal arithmetic
-    if (this.wasDecimal || other.wasDecimal || this.hasDecimalPart() || other.hasDecimalPart()) {
-      return this.toDecimal().pow(other.toDecimal());
-    }
-    return this.getIntPart() ** other.getIntPart();
-  }
+  return new Decimal(value);
 }
 
-// Helper to perform arithmetic operations with Decimal support
+/**
+ * Helper to perform arithmetic operations with BigInt and Decimal support
+ * Type promotion: number < BigInt < Decimal
+ * - If either operand is Decimal, result is Decimal
+ * - Else if either operand is BigInt, result is BigInt (except division, which uses Decimal)
+ * - Otherwise, use regular JavaScript number arithmetic
+ */
 function performArithmetic(
   left: any,
   right: any,
@@ -200,35 +61,58 @@ function performArithmetic(
     }
   }
 
-  // Use NumericValue for precise calculations ONLY when we have BigInt or Decimal
-  // This preserves regular JavaScript number behavior for normal numbers
-  const hasPreciseType = (val: any) => typeof val === 'bigint' || val instanceof Decimal;
+  const leftIsDecimal = left instanceof Decimal;
+  const rightIsDecimal = right instanceof Decimal;
+  const leftIsBigInt = typeof left === 'bigint';
+  const rightIsBigInt = typeof right === 'bigint';
 
-  if (hasPreciseType(left) || hasPreciseType(right)) {
-    try {
-      const leftNum = new NumericValue(left);
-      const rightNum = new NumericValue(right);
+  // If either is Decimal, use Decimal arithmetic
+  if (leftIsDecimal || rightIsDecimal) {
+    const leftDecimal = toDecimal(left);
+    const rightDecimal = toDecimal(right);
 
-      switch (op) {
-        case '+':
-          return leftNum.add(rightNum);
-        case '-':
-          return leftNum.subtract(rightNum);
-        case '*':
-          return leftNum.multiply(rightNum);
-        case '/':
-          return leftNum.divide(rightNum);
-        case '%':
-          return leftNum.modulo(rightNum);
-        case '**':
-          return leftNum.power(rightNum);
-      }
-    } catch {
-      // Fall through to legacy arithmetic if NumericValue fails
+    switch (op) {
+      case '+':
+        return leftDecimal.plus(rightDecimal);
+      case '-':
+        return leftDecimal.minus(rightDecimal);
+      case '*':
+        return leftDecimal.times(rightDecimal);
+      case '/':
+        return leftDecimal.dividedBy(rightDecimal);
+      case '%':
+        return leftDecimal.modulo(rightDecimal);
+      case '**':
+        return leftDecimal.pow(rightDecimal);
     }
   }
 
-  // Regular JavaScript arithmetic for normal numbers
+  // Division always uses Decimal for precision, even for BigInt
+  if (op === '/') {
+    return toDecimal(left).dividedBy(toDecimal(right));
+  }
+
+  // If either is BigInt, use BigInt arithmetic (division already handled above)
+  if (leftIsBigInt || rightIsBigInt) {
+    // Convert to BigInt (this also works if one is already BigInt)
+    const leftBigInt = typeof left === 'bigint' ? left : BigInt(left);
+    const rightBigInt = typeof right === 'bigint' ? right : BigInt(right);
+
+    switch (op) {
+      case '+':
+        return leftBigInt + rightBigInt;
+      case '-':
+        return leftBigInt - rightBigInt;
+      case '*':
+        return leftBigInt * rightBigInt;
+      case '%':
+        return leftBigInt % rightBigInt;
+      case '**':
+        return leftBigInt ** rightBigInt;
+    }
+  }
+
+  // Regular JavaScript arithmetic for normal numbers (division already handled above)
   let result: number;
   switch (op) {
     case '+':
@@ -239,9 +123,6 @@ function performArithmetic(
       break;
     case '*':
       result = left * right;
-      break;
-    case '/':
-      result = left / right;
       break;
     case '%':
       result = left % right;
@@ -269,8 +150,6 @@ function performArithmetic(
           return leftBigInt - rightBigInt;
         case '*':
           return leftBigInt * rightBigInt;
-        case '/':
-          return leftBigInt / rightBigInt;
         case '%':
           return leftBigInt % rightBigInt;
         case '**':
@@ -280,39 +159,36 @@ function performArithmetic(
       // If BigInt conversion fails, return the Number result
       return result;
     }
-  }
-
-  return result;
+  } return result;
 }
 
-// Helper to perform comparison operations with Decimal and BigInt support
+/**
+ * Helper to perform comparison operations with BigInt and Decimal support
+ */
 function performComparison(
   left: any,
   right: any,
   op: '>' | '<' | '>=' | '<='
 ): boolean {
-  // Use NumericValue for precise comparisons when we have BigInt or Decimal
-  const hasPreciseType = (val: any) => typeof val === 'bigint' || val instanceof Decimal;
+  const leftIsDecimal = left instanceof Decimal;
+  const rightIsDecimal = right instanceof Decimal;
+  const leftIsBigInt = typeof left === 'bigint';
+  const rightIsBigInt = typeof right === 'bigint';
 
-  if (hasPreciseType(left) || hasPreciseType(right)) {
-    try {
-      const leftNum = new NumericValue(left);
-      const rightNum = new NumericValue(right);
-      const leftDecimal = leftNum.toDecimal();
-      const rightDecimal = rightNum.toDecimal();
+  // If either is Decimal or BigInt, use Decimal for comparison (most precise)
+  if (leftIsDecimal || rightIsDecimal || leftIsBigInt || rightIsBigInt) {
+    const leftDecimal = toDecimal(left);
+    const rightDecimal = toDecimal(right);
 
-      switch (op) {
-        case '>':
-          return leftDecimal.greaterThan(rightDecimal);
-        case '<':
-          return leftDecimal.lessThan(rightDecimal);
-        case '>=':
-          return leftDecimal.greaterThanOrEqualTo(rightDecimal);
-        case '<=':
-          return leftDecimal.lessThanOrEqualTo(rightDecimal);
-      }
-    } catch {
-    // Fall through to regular comparison if NumericValue fails
+    switch (op) {
+      case '>':
+        return leftDecimal.greaterThan(rightDecimal);
+      case '<':
+        return leftDecimal.lessThan(rightDecimal);
+      case '>=':
+        return leftDecimal.greaterThanOrEqualTo(rightDecimal);
+      case '<=':
+        return leftDecimal.lessThanOrEqualTo(rightDecimal);
     }
   }
 
@@ -384,29 +260,29 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
           return leftVal && rightVal;
         case '==': {
           // Special handling for Decimal and BigInt equality
-          const hasPreciseType = (val: any) => typeof val === 'bigint' || val instanceof Decimal;
-          if (hasPreciseType(leftVal) || hasPreciseType(rightVal)) {
-            try {
-              const leftNum = new NumericValue(leftVal);
-              const rightNum = new NumericValue(rightVal);
-              return leftNum.toDecimal().equals(rightNum.toDecimal());
-            } catch {
-              // Fall through to regular equality
-            }
+          const leftIsDecimal = leftVal instanceof Decimal;
+          const rightIsDecimal = rightVal instanceof Decimal;
+          const leftIsBigInt = typeof leftVal === 'bigint';
+          const rightIsBigInt = typeof rightVal === 'bigint';
+
+          if (leftIsDecimal || rightIsDecimal || leftIsBigInt || rightIsBigInt) {
+            const leftDecimal = toDecimal(leftVal);
+            const rightDecimal = toDecimal(rightVal);
+            return leftDecimal.equals(rightDecimal);
           }
           return _.isEqual(leftVal, rightVal);
         }
         case '!=': {
           // Special handling for Decimal and BigInt inequality
-          const hasPreciseType = (val: any) => typeof val === 'bigint' || val instanceof Decimal;
-          if (hasPreciseType(leftVal) || hasPreciseType(rightVal)) {
-            try {
-              const leftNum = new NumericValue(leftVal);
-              const rightNum = new NumericValue(rightVal);
-              return !leftNum.toDecimal().equals(rightNum.toDecimal());
-            } catch {
-              // Fall through to regular inequality
-            }
+          const leftIsDecimal = leftVal instanceof Decimal;
+          const rightIsDecimal = rightVal instanceof Decimal;
+          const leftIsBigInt = typeof leftVal === 'bigint';
+          const rightIsBigInt = typeof rightVal === 'bigint';
+
+          if (leftIsDecimal || rightIsDecimal || leftIsBigInt || rightIsBigInt) {
+            const leftDecimal = toDecimal(leftVal);
+            const rightDecimal = toDecimal(rightVal);
+            return !leftDecimal.equals(rightDecimal);
           }
           return !_.isEqual(leftVal, rightVal);
         }
