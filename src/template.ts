@@ -37,7 +37,8 @@ function reconstructExpression(expr: ExprNode): string {
 
       // Handle different data types
       if (litNode.dataType === 'string') {
-        return `"${(litNode.value as string).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+        // Use JSON.stringify to properly escape all special characters
+        return JSON.stringify(litNode.value as string);
       } else if (litNode.dataType === 'bigint' || litNode.dataType === 'decimal') {
         // BigInt and Decimal are stored as strings in AST
         return litNode.value as string;
