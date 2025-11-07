@@ -85,6 +85,7 @@ export const OPERATORS: Record<string, { precedence: number; associativity: 'lef
   '/': { precedence: 10, associativity: 'left' },
   '%': { precedence: 10, associativity: 'left' },
   '**': { precedence: 11, associativity: 'right' }, // Exponentiation is right-associative
+  // Note: Member access (. and []) are handled as postfix operations, not binary operators
 };
 
 type Token =
@@ -345,10 +346,17 @@ function tokenize(expr: string): Token[] {
       continue;
     }
 
+    // Handle standalone dot (property access operator)
+    if (char === '.') {
+      tokens.push({ type: 'operator', operator: '.' } as any);
+      i++;
+      continue;
+    }
+
     // Identifiers (variables, booleans, method names)
     if (/[a-zA-Z_]/.test(char)) {
       let ident = '';
-      while (i < expr.length && /[a-zA-Z0-9_.]/.test(expr[i])) {
+      while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) {
         ident += expr[i];
         i++;
       }
@@ -374,8 +382,45 @@ function tokenize(expr: string): Token[] {
   return tokens;
 }
 
-// Shunting-yard algorithm to convert infix to postfix (RPN)
+// Validate token sequence for syntax errors
+function validateTokens(tokens: Token[]): void {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const nextToken = i + 1 < tokens.length ? tokens[i + 1] : null;
+    const prevToken = i > 0 ? tokens[i - 1] : null;
+
+    // Check for consecutive dots
+    if (token.type === 'operator' && token.operator === '.') {
+      if (nextToken && nextToken.type === 'operator' && nextToken.operator === '.') {
+        throw new Error('Invalid syntax: consecutive dots not allowed');
+      }
+
+      // Dot cannot be at the start
+      if (!prevToken) {
+        throw new Error('Invalid syntax: expression cannot start with dot');
+      }
+
+      // Dot cannot be at the end
+      if (!nextToken) {
+        throw new Error('Invalid syntax: expression cannot end with dot');
+      }
+
+      // Dot must be followed by an identifier (variable)
+      if (nextToken.type !== 'variable') {
+        throw new Error('Invalid syntax: dot must be followed by property name');
+      }
+
+      // Dot must be preceded by a value (variable, closing bracket, or closing paren)
+      if (prevToken.type !== 'variable' && prevToken.type !== 'rbracket' && prevToken.type !== 'rparen') {
+        throw new Error('Invalid syntax: dot must follow a value');
+      }
+    }
+  }
+}// Shunting-yard algorithm to convert infix to postfix (RPN)
 function infixToPostfix(tokens: Token[]): Token[] {
+  // Validate token sequence first
+  validateTokens(tokens);
+
   const output: Token[] = [];
   const operatorStack: Token[] = [];
   
@@ -411,13 +456,41 @@ function infixToPostfix(tokens: Token[]): Token[] {
       }
     }
     else if (token.type === 'operator') {
+      // Handle dot as a postfix operator for member access
+      if (token.operator === '.') {
+        // Dot is a postfix operator - immediately process it
+        // The next token must be a variable (property name)
+        if (i + 1 >= tokens.length || tokens[i + 1].type !== 'variable') {
+          throw new Error('Invalid property access: dot must be followed by property name');
+        }
+
+        // Get the property name from the next token
+        i++; // Skip to the property name token
+        const propertyToken = tokens[i];
+
+        // Push the property name as a string literal
+        output.push({ type: 'string', value: (propertyToken as any).name } as any);
+
+        // Push the dot access operator
+        output.push({ type: 'operator', operator: '.access' } as any);
+
+        if (argCountStack.length > 0) {
+          argCountStack[argCountStack.length - 1].hasArgs = true;
+        }
+        continue;
+      }
+
       const op1 = OPERATORS[token.operator];
+      if (!op1) {
+        throw new Error(`Unknown operator: ${token.operator}`);
+      }
+
       while (operatorStack.length > 0) {
         const top = operatorStack[operatorStack.length - 1];
         if (top.type === 'operator') {
           const op2 = OPERATORS[top.operator];
-          if ((op1.associativity === 'left' && op1.precedence <= op2.precedence) ||
-            (op1.associativity === 'right' && op1.precedence < op2.precedence)) {
+          if (op2 && ((op1.associativity === 'left' && op1.precedence <= op2.precedence) ||
+            (op1.associativity === 'right' && op1.precedence < op2.precedence))) {
             output.push(operatorStack.pop()!);
           } else {
             break;
@@ -506,7 +579,7 @@ function infixToPostfix(tokens: Token[]): Token[] {
         output.push(operatorStack.pop()!);
       }
       if (operatorStack.length === 0) {
-        throw new Error('Mismatched brackets');
+        throw new Error('Mismatched brackets: closing bracket without opening bracket');
       }
 
       const lbracket = operatorStack.pop()!;
@@ -514,6 +587,10 @@ function infixToPostfix(tokens: Token[]): Token[] {
 
       // Check if this was member access or array literal
       if ((lbracket as any).isMemberAccess) {
+        // Member access: must have an index expression
+        if (!argInfo || !argInfo.hasArgs) {
+          throw new Error('Empty brackets in member access: index expression required');
+        }
         // Member access: push a special operator for member access
         // The index should be a single expression
         output.push({ type: 'operator', operator: '[]access' } as any);
@@ -522,7 +599,7 @@ function infixToPostfix(tokens: Token[]): Token[] {
           argCountStack[argCountStack.length - 1].hasArgs = true;
         }
       } else {
-      // Array literal
+        // Array literal (empty brackets are valid for empty arrays)
         const elementCount = argInfo && argInfo.hasArgs ? argInfo.commaCount + 1 : 0;
         output.push({ type: 'operator', operator: '[]', argCount: elementCount } as any);
 
@@ -536,8 +613,14 @@ function infixToPostfix(tokens: Token[]): Token[] {
   // Pop remaining operators
   while (operatorStack.length > 0) {
     const top = operatorStack.pop()!;
-    if (top.type === 'lparen' || top.type === 'rparen') {
-      throw new Error('Mismatched parentheses');
+    if (top.type === 'lparen') {
+      throw new Error('Mismatched parentheses: unclosed opening parenthesis');
+    }
+    if (top.type === 'rparen') {
+      throw new Error('Mismatched parentheses: unexpected closing parenthesis');
+    }
+    if (top.type === 'lbracket') {
+      throw new Error('Mismatched brackets: unclosed opening bracket');
     }
     output.push(top);
   }
@@ -590,6 +673,17 @@ function buildASTFromPostfix(postfix: Token[]): ExprNode {
         continue;
       }
 
+      if (token.operator === '.access') {
+        // Dot access operator (postfix)
+        // Pop the property name (string) and the object
+        const property = stack.pop();
+        const object = stack.pop();
+        if (!object || !property) throw new Error('Invalid expression: missing operands for property access');
+
+        stack.push(createMemberAccessNode(object, property));
+        continue;
+      }
+
       const right = stack.pop();
       const left = stack.pop();
       if (!left || !right) throw new Error('Invalid expression: missing operands');
@@ -635,21 +729,28 @@ export function parseExpression(expr: string): ExprNode {
   if (expr === 'true') return createLiteralNode(true);
   if (expr === 'false') return createLiteralNode(false);
   // Removed greedy string literal check - let tokenizer handle all string cases
-  if (!isNaN(Number(expr)) && expr !== '' && !/[+\-*/%&|^<>!~()[\],]/.test(expr)) {
-  // Only use quick path if there are no operators or special characters
+  if (!isNaN(Number(expr)) && expr !== '' && !/[+\-*/%&|^<>!~()[\],]/i.test(expr)) {
+  // Only use quick path if there are no operators or special characters (excluding dots for identifiers)
     return createLiteralNode(parseNumber(expr));
   }
   if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(expr)) {
+    // Validate dotted identifier before using quick path
+    if (expr.includes('.')) {
+      if (expr.startsWith('.')) {
+        throw new Error(`Invalid identifier: cannot start with dot: ${expr}`);
+      }
+      if (expr.endsWith('.')) {
+        throw new Error(`Invalid identifier: cannot end with dot: ${expr}`);
+      }
+      if (expr.includes('..')) {
+        throw new Error(`Invalid identifier: consecutive dots not allowed: ${expr}`);
+      }
+    }
     return createVariableNode(expr);
   }
   
   // Parse complex expressions using Shunting-yard algorithm
-  try {
-    const tokens = tokenize(expr);
-    const postfix = infixToPostfix(tokens);
-    return buildASTFromPostfix(postfix);
-  } catch (error) {
-    // Fallback: treat as variable
-    return createVariableNode(expr);
-  }
+  const tokens = tokenize(expr);
+  const postfix = infixToPostfix(tokens);
+  return buildASTFromPostfix(postfix);
 }
