@@ -236,18 +236,18 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
 
     case 'variable':
       const value = _.get(data, node.name);
-      return !_.isNil(value) ? value : '';
+      return value;
 
     case 'memberAccess':
       const obj = evalExprNode(node.object, data, methods);
       const prop = evalExprNode(node.property, data, methods);
 
       // Handle array/object access
-      if (_.isNil(obj)) return '';
+      if (_.isNil(obj)) return undefined;
 
       // Use lodash get for safe access
       const result = _.get(obj, prop);
-      return !_.isNil(result) ? result : '';
+      return result;
 
     case 'binaryOp':
       const leftVal = evalExprNode(node.left, data, methods);
@@ -336,13 +336,13 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
 
     case 'methodCall':
       const method = methods[node.methodName];
-      if (!method) return '';
+      if (!method) return undefined;
 
       const evalArgs = node.args.map(arg => {
         const val = evalExprNode(arg, data, methods);
 
         // Convert special types to standard JavaScript types for method arguments.
-        // User-provided methods should only receive standard JS types (string, number, boolean, array, object, null).
+        // User-provided methods should only receive standard JS types (string, number, boolean, array, object, null, undefined).
         // Internal calculations maintain precision with BigInt/Decimal, but method boundaries normalize to JS types.
 
         if (typeof val === 'bigint') {
@@ -362,5 +362,5 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
       return method(...evalArgs);
   }
 
-  return '';
+  return undefined;
 }
