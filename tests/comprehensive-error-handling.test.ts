@@ -53,16 +53,18 @@ describe('Comprehensive Error Handling', () => {
       expect(() => new Template('{{ () }}')).toThrow(/invalid expression/i);
     });
 
-    test('should throw on operator at start of expression', () => {
-      expect(() => new Template('{{ + a }}')).toThrow(/invalid expression/i);
+    test('should allow unary plus at start of expression', () => {
+      const template = new Template('{{ +a }}');
+      expect(template.render({ a: 5 })).toBe('5');
     });
 
     test('should throw on operator at end of expression', () => {
       expect(() => new Template('{{ a + }}')).toThrow(/invalid expression/i);
     });
 
-    test('should throw on consecutive binary operators', () => {
-      expect(() => new Template('{{ a + + b }}')).toThrow(/invalid expression/i);
+    test('should allow unary plus after binary operator', () => {
+      const template = new Template('{{ a + +b }}');
+      expect(template.render({ a: 5, b: 3 })).toBe('8');
     });
 
     test('should throw on multiple operators without operands', () => {
@@ -112,6 +114,69 @@ describe('Comprehensive Error Handling', () => {
       const template = new Template('{{   }}');
       const result = template.render({});
       expect(result).toBe('');
+    });
+  });
+
+  describe('Unary Operators', () => {
+    test('should handle unary minus with variables', () => {
+      const template = new Template('{{ -a }}');
+      expect(template.render({ a: 5 })).toBe('-5');
+    });
+
+    test('should handle unary plus with variables', () => {
+      const template = new Template('{{ +a }}');
+      expect(template.render({ a: 5 })).toBe('5');
+    });
+
+    test('should handle unary minus with negative numbers', () => {
+      const template = new Template('{{ -a }}');
+      expect(template.render({ a: -5 })).toBe('5');
+    });
+
+    test('should handle unary plus with negative numbers', () => {
+      const template = new Template('{{ +a }}');
+      expect(template.render({ a: -5 })).toBe('-5');
+    });
+
+    test('should handle unary minus in expressions', () => {
+      const template = new Template('{{ a + -b }}');
+      expect(template.render({ a: 10, b: 3 })).toBe('7');
+    });
+
+    test('should handle unary plus in expressions', () => {
+      const template = new Template('{{ a + +b }}');
+      expect(template.render({ a: 10, b: 3 })).toBe('13');
+    });
+
+    test('should handle multiple unary operators', () => {
+      const template = new Template('{{ --a }}');
+      expect(template.render({ a: 5 })).toBe('5');
+    });
+
+    test('should handle unary minus with Decimal values', () => {
+      const Decimal = require('decimal.js');
+      const template = new Template('{{ -a }}');
+      expect(template.render({ a: new Decimal('3.14') })).toBe('-3.14');
+    });
+
+    test('should handle unary minus with BigInt values', () => {
+      const template = new Template('{{ -a }}');
+      expect(template.render({ a: BigInt(42) })).toBe('-42');
+    });
+
+    test('should handle unary operators in complex expressions', () => {
+      const template = new Template('{{ -a * +b + -c }}');
+      expect(template.render({ a: 2, b: 3, c: 4 })).toBe('-10');
+    });
+
+    test('should handle unary operators with parentheses', () => {
+      const template = new Template('{{ -(a + b) }}');
+      expect(template.render({ a: 5, b: 3 })).toBe('-8');
+    });
+
+    test('should handle unary operators in array context', () => {
+      const template = new Template('{{ [-a, +b, -c] }}');
+      expect(template.render({ a: 1, b: 2, c: 3 })).toBe('-1,2,-3');
     });
   });
 
@@ -313,12 +378,36 @@ describe('Comprehensive Error Handling', () => {
       expect(() => new Template('{% for item-name in items %}{{ item }}{% endfor %}')).toThrow(/invalid for loop syntax/i);
     });
 
-    test('should throw on for loop with reserved keyword as variable', () => {
-      // This might be allowed by the regex, but worth testing behavior
-      const template = new Template('{% for in in items %}{{ in }}{% endfor %}');
-      const result = template.render({ items: [1, 2, 3] });
-      // Should work because 'in' is valid as a variable name in this context
-      expect(result).toBe('123');
+    test('should throw on for loop with reserved keyword "for" as variable', () => {
+      expect(() => new Template('{% for for in items %}{{ for }}{% endfor %}')).toThrow(/reserved keyword/i);
+    });
+
+    test('should throw on for loop with reserved keyword "if" as variable', () => {
+      expect(() => new Template('{% for if in items %}{{ if }}{% endfor %}')).toThrow(/reserved keyword/i);
+    });
+
+    test('should throw on for loop with reserved keyword "true" as variable', () => {
+      expect(() => new Template('{% for true in items %}{{ true }}{% endfor %}')).toThrow(/reserved keyword/i);
+    });
+
+    test('should throw on for loop with reserved keyword "false" as variable', () => {
+      expect(() => new Template('{% for false in items %}{{ false }}{% endfor %}')).toThrow(/reserved keyword/i);
+    });
+
+    test('should throw on for loop with reserved keyword "null" as variable', () => {
+      expect(() => new Template('{% for null in items %}{{ null }}{% endfor %}')).toThrow(/reserved keyword/i);
+    });
+
+    test('should throw on for loop with reserved keyword "return" as variable', () => {
+      expect(() => new Template('{% for return in items %}{{ return }}{% endfor %}')).toThrow(/reserved keyword/i);
+    });
+
+    test('should throw on for loop with reserved keyword as index variable', () => {
+      expect(() => new Template('{% for item, if in items %}{{ item }}{% endfor %}')).toThrow(/reserved keyword/i);
+    });
+
+    test('should throw on for loop with reserved keyword "while" as variable', () => {
+      expect(() => new Template('{% for while in items %}{{ while }}{% endfor %}')).toThrow(/reserved keyword/i);
     });
 
     test('should throw on for loop without closing tag', () => {
@@ -913,4 +1002,69 @@ describe('Comprehensive Error Handling', () => {
       expect(methods.sort()).toEqual(['format', 'validate']);
     });
   });
+
+  describe('Boolean Literal Behavior', () => {
+    test('should treat true as boolean literal, not variable', () => {
+      const template = new Template('{{ true }}');
+      expect(template.render({ true: 'myValue' })).toBe('true');
+    });
+
+    test('should treat false as boolean literal, not variable', () => {
+      const template = new Template('{{ false }}');
+      expect(template.render({ false: 'myValue' })).toBe('false');
+    });
+
+    test('should not extract true as variable', () => {
+      const template = new Template('{{ true }}');
+      expect(template.variables).toEqual([]);
+    });
+
+    test('should not extract false as variable', () => {
+      const template = new Template('{{ false }}');
+      expect(template.variables).toEqual([]);
+    });
+
+    test('should use boolean literals in conditions', () => {
+      const template = new Template('{% if true %}yes{% else %}no{% endif %}');
+      expect(template.render({})).toBe('yes');
+    });
+
+    test('should allow boolean literals in expressions', () => {
+      const template = new Template('{{ true && false }}');
+      expect(template.render({})).toBe('false');
+    });
+  });
+
+  describe('Reserved Keywords in Data Variables', () => {
+    test('should allow reserved keyword "for" as data variable', () => {
+      const template = new Template('{{ for }}');
+      expect(template.render({ for: 'loop' })).toBe('loop');
+    });
+
+    test('should allow reserved keyword "if" as data variable', () => {
+      const template = new Template('{{ if }}');
+      expect(template.render({ if: 'condition' })).toBe('condition');
+    });
+
+    test('should allow reserved keyword "while" as data variable', () => {
+      const template = new Template('{{ while }}');
+      expect(template.render({ while: 'loop' })).toBe('loop');
+    });
+
+    test('should allow reserved keyword "return" as data variable', () => {
+      const template = new Template('{{ return }}');
+      expect(template.render({ return: 'value' })).toBe('value');
+    });
+
+    test('should extract reserved keywords as variables from data context', () => {
+      const template = new Template('{{ for }}{{ if }}');
+      expect(template.variables.sort()).toEqual(['for', 'if']);
+    });
+
+    test('should allow reserved keywords in nested property access', () => {
+      const template = new Template('{{ obj.for }}');
+      expect(template.render({ obj: { for: 'nested' } })).toBe('nested');
+    });
+  });
 });
+

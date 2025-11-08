@@ -250,11 +250,11 @@ function tokenize(expr: string): Token[] {
       continue;
     }
 
-    // Numbers (including negative numbers in unary position)
+    // Numbers (including negative numbers in unary position when followed by digit)
     if (/\d/.test(char) || (char === '.' && i + 1 < expr.length && /\d/.test(expr[i + 1])) ||
       (char === '-' && i + 1 < expr.length && /\d/.test(expr[i + 1]))) {
 
-      // Check if minus is in unary position
+      // Check if minus is in unary position and followed by digit
       if (char === '-') {
         const prevToken = tokens[tokens.length - 1];
         const isUnary = !prevToken ||
@@ -264,8 +264,8 @@ function tokenize(expr: string): Token[] {
           prevToken.type === 'lbracket' ||
           prevToken.type === 'comma';
 
-        // Only treat as negative number if in unary position
-        if (isUnary) {
+        // Only treat as negative number if in unary position and followed by digit
+        if (isUnary && i + 1 < expr.length && /\d/.test(expr[i + 1])) {
           let num = '-';
           i++; // Skip the minus
           while (i < expr.length && /[\d.]/.test(expr[i])) {
@@ -305,9 +305,30 @@ function tokenize(expr: string): Token[] {
       }
     }
 
-    // Single-character operators
-    if ('+-*/%&|^<>'.includes(char)) {
+    // Single-character operators (handle minus specially for unary)
+    if ('*/%&|^<>'.includes(char)) {
       tokens.push({ type: 'operator', operator: char });
+      i++;
+      continue;
+    }
+
+    // Handle + and - as either binary operators or unary operators
+    if (char === '+' || char === '-') {
+      const prevToken = tokens[tokens.length - 1];
+      const isUnary = !prevToken ||
+        prevToken.type === 'operator' ||
+        prevToken.type === 'unary' ||
+        prevToken.type === 'lparen' ||
+        prevToken.type === 'lbracket' ||
+        prevToken.type === 'comma';
+
+      if (isUnary) {
+        // Treat as unary operator
+        tokens.push({ type: 'unary', operator: char });
+      } else {
+        // Treat as binary operator
+        tokens.push({ type: 'operator', operator: char });
+      }
       i++;
       continue;
     }

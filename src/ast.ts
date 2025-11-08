@@ -65,7 +65,7 @@ export interface BinaryOpNode extends BaseExprNode {
 
 export interface UnaryOpNode extends BaseExprNode {
   type: 'unaryOp';
-  operator: '!' | '~';
+  operator: '!' | '~' | '+' | '-';
   operand: ExprNode;
 }
 

@@ -331,6 +331,24 @@ export function evalExprNode(node: ExprNode, data: TemplateData, methods: Templa
           return !operandVal;
         case '~':
           return ~operandVal;
+        case '-':
+          // Unary minus: negate the value
+          if (operandVal instanceof Decimal) {
+            return operandVal.negated();
+          }
+          if (typeof operandVal === 'bigint') {
+            return -operandVal;
+          }
+          return -operandVal;
+        case '+':
+          // Unary plus: convert to number
+          if (operandVal instanceof Decimal) {
+            return operandVal;
+          }
+          if (typeof operandVal === 'bigint') {
+            return operandVal;
+          }
+          return +operandVal;
       }
       break;
 

@@ -26,6 +26,21 @@
 import type { ASTNode, TextNode, InterpolationNode, ForLoopNode, IfNode, IfBranch, CommentNode, ExprNode } from './ast';
 import { parseExpression } from './exprParser';
 
+// Reserved keywords that cannot be used as variable names
+const RESERVED_KEYWORDS = new Set([
+  // JavaScript reserved words
+  'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default',
+  'delete', 'do', 'else', 'export', 'extends', 'finally', 'for', 'function',
+  'if', 'import', 'in', 'instanceof', 'let', 'new', 'return', 'super', 'switch',
+  'this', 'throw', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield',
+  // Boolean literals
+  'true', 'false',
+  // Null/undefined
+  'null', 'undefined',
+  // Template control flow keywords
+  'elif', 'endif', 'endfor'
+]);
+
 function createTextNode(text: string): TextNode {
   return {
     type: 'text',
@@ -275,6 +290,14 @@ export function parseTemplate(template: string): ASTNode[] {
       
       const [, itemVar, indexVar, arrayExpr] = forMatch;
       
+      // Check for reserved keywords
+      if (RESERVED_KEYWORDS.has(itemVar)) {
+        throw new Error(`Cannot use reserved keyword '${itemVar}' as variable name in for loop`);
+      }
+      if (indexVar && RESERVED_KEYWORDS.has(indexVar)) {
+        throw new Error(`Cannot use reserved keyword '${indexVar}' as variable name in for loop`);
+      }
+
       // Find the matching endfor
       const endForTag = findMatchingEnd(template, tagEnd + 2, 'for', 'endfor');
       if (endForTag === -1) {

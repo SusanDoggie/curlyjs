@@ -166,8 +166,22 @@ describe('Comment Edge Cases', () => {
     expect(t.render({})).toBe('text');
   });
 
+  test('comments do not nest - first #} closes the comment', () => {
+    // This is consistent with Jinja2 behavior - comments don't nest
+    const t = new Template('{# outer {# inner #} still in comment #}');
+    // The first #} closes the comment, leaving " still in comment #}" as text
+    expect(t.render({})).toBe(' still in comment #}');
+  });
+
+  test('comment delimiter inside comment ends comment', () => {
+    const t = new Template('{# text #} more #}end');
+    // The first #} closes the comment
+    expect(t.render({})).toBe(' more #}end');
+  });
+
   test('comment does not interfere with adjacent tags', () => {
     const t = new Template('{{name}}{#comment#}{{age}}');
     expect(t.render({ name: 'Bob', age: 25 })).toBe('Bob25');
   });
 });
+
