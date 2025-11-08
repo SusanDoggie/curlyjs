@@ -178,6 +178,56 @@ describe('Comprehensive Error Handling', () => {
       const template = new Template('{{ [-a, +b, -c] }}');
       expect(template.render({ a: 1, b: 2, c: 3 })).toBe('-1,2,-3');
     });
+
+    test('should handle double logical NOT (!!)', () => {
+      const template = new Template('{{ !!a }}');
+      expect(template.render({ a: 5 })).toBe('true');
+      expect(template.render({ a: 0 })).toBe('false');
+      expect(template.render({ a: null })).toBe('false');
+    });
+
+    test('should handle triple logical NOT (!!!)', () => {
+      const template = new Template('{{ !!!a }}');
+      expect(template.render({ a: 5 })).toBe('false');
+      expect(template.render({ a: 0 })).toBe('true');
+    });
+
+    test('should handle double bitwise NOT (~~)', () => {
+      const template = new Template('{{ ~~a }}');
+      expect(template.render({ a: 5.7 })).toBe('5');
+      expect(template.render({ a: -3.9 })).toBe('-3');
+    });
+
+    test('should handle double unary minus (--)', () => {
+      const template = new Template('{{ --a }}');
+      expect(template.render({ a: 5 })).toBe('5');
+      expect(template.render({ a: -5 })).toBe('-5');
+    });
+
+    test('should handle mixed unary operators (-+)', () => {
+      const template = new Template('{{ -+a }}');
+      expect(template.render({ a: 5 })).toBe('-5');
+    });
+
+    test('should handle mixed unary operators (!-)', () => {
+      const template = new Template('{{ !-a }}');
+      expect(template.render({ a: 5 })).toBe('false');
+      expect(template.render({ a: 0 })).toBe('true');
+    });
+
+    test('should handle mixed unary operators (-!)', () => {
+      const template = new Template('{{ -!a }}');
+      // -!5 = -(false) = 0
+      expect(template.render({ a: 5 })).toBe('0');
+      // -!0 = -(true) = -1
+      expect(template.render({ a: 0 })).toBe('-1');
+    });
+
+    test('should handle complex unary chains (!!~)', () => {
+      const template = new Template('{{ !!~a }}');
+      expect(template.render({ a: 5 })).toBe('true');
+      expect(template.render({ a: -1 })).toBe('false');
+    });
   });
 
   describe('Method Call Errors', () => {
