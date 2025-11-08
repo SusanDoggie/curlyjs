@@ -267,8 +267,8 @@ export function parseTemplate(template: string): ASTNode[] {
 
     // Check what type of tag this is
     if (tagType === 'stmt' && tagContent.startsWith('for ')) {
-      // Parse for loop - allow complex expressions after 'in'
-      const forMatch = tagContent.match(/^for\s+(\w+)(?:\s*,\s*(\w+))?\s+in\s+(.+)$/);
+      // Parse for loop - variable names must start with letter or underscore (valid JS identifiers)
+      const forMatch = tagContent.match(/^for\s+([a-zA-Z_]\w*)(?:\s*,\s*([a-zA-Z_]\w*))?\s+in\s+(.+)$/);
       if (!forMatch) {
         throw new Error('Invalid for loop syntax: ' + tagContent);
       }

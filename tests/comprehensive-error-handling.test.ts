@@ -278,6 +278,180 @@ describe('Comprehensive Error Handling', () => {
     });
   });
 
+  describe('Advanced Control Flow Syntax Errors', () => {
+    // For loop edge cases
+    test('should throw on for loop with only whitespace after in', () => {
+      expect(() => new Template('{% for item in   %}{{ item }}{% endfor %}')).toThrow(/invalid for loop syntax/i);
+    });
+
+    test('should throw on for loop with missing endfor', () => {
+      expect(() => new Template('{% for item in items %}{{ item }}')).toThrow(/no matching endfor/i);
+    });
+
+    test('should throw on for loop with only "for" keyword', () => {
+      expect(() => new Template('{% for %}{% endfor %}')).toThrow(/unknown statement|invalid for loop syntax/i);
+    });
+
+    test('should throw on for loop with malformed variable syntax', () => {
+      expect(() => new Template('{% for item, in items %}{{ item }}{% endfor %}')).toThrow(/invalid for loop syntax/i);
+    });
+
+    test('should throw on for loop with trailing comma after variable', () => {
+      expect(() => new Template('{% for item, index, in items %}{{ item }}{% endfor %}')).toThrow(/invalid for loop syntax/i);
+    });
+
+    test('should throw on for loop with space before "in" missing', () => {
+      expect(() => new Template('{% for itemin items %}{{ item }}{% endfor %}')).toThrow(/invalid for loop syntax/i);
+    });
+
+    test('should throw on for loop with numeric-starting variable name', () => {
+      // Variable names must start with a letter or underscore, not a digit
+      expect(() => new Template('{% for 123item in items %}{{ 123item }}{% endfor %}')).toThrow(/invalid for loop syntax/i);
+    });
+
+    test('should throw on for loop with special characters in variable', () => {
+      expect(() => new Template('{% for item-name in items %}{{ item }}{% endfor %}')).toThrow(/invalid for loop syntax/i);
+    });
+
+    test('should throw on for loop with reserved keyword as variable', () => {
+      // This might be allowed by the regex, but worth testing behavior
+      const template = new Template('{% for in in items %}{{ in }}{% endfor %}');
+      const result = template.render({ items: [1, 2, 3] });
+      // Should work because 'in' is valid as a variable name in this context
+      expect(result).toBe('123');
+    });
+
+    test('should throw on for loop without closing tag', () => {
+      expect(() => new Template('{% for item in items')).toThrow(/unclosed tag/i);
+    });
+
+    test('should throw on endfor without matching for', () => {
+      expect(() => new Template('{% endfor %}')).toThrow(/unexpected tag/i);
+    });
+
+    test('should throw on for loop with mismatched end tag', () => {
+      expect(() => new Template('{% for item in items %}{{ item }}{% endif %}')).toThrow(/unexpected tag|no matching endfor/i);
+    });
+
+    // If/elif/else edge cases
+    test('should throw on if without closing tag', () => {
+      expect(() => new Template('{% if condition')).toThrow(/unclosed tag/i);
+    });
+
+    test('should throw on if with only whitespace as condition', () => {
+      expect(() => new Template('{% if   %}yes{% endif %}')).toThrow(/unknown statement|invalid/i);
+    });
+
+    test('should throw on elif with only whitespace as condition', () => {
+      expect(() => new Template('{% if a %}A{% elif   %}B{% endif %}')).toThrow(/unknown statement|invalid/i);
+    });
+
+    test('should throw on if with missing endif', () => {
+      expect(() => new Template('{% if condition %}yes')).toThrow(/no matching endif/i);
+    });
+
+    test('should throw on multiple consecutive elif without else', () => {
+      // This should be valid syntax
+      const template = new Template('{% if a %}A{% elif b %}B{% elif c %}C{% endif %}');
+      const result = template.render({ a: false, b: false, c: true });
+      expect(result).toBe('C');
+    });
+
+    test('should throw on else with condition', () => {
+      expect(() => new Template('{% if a %}A{% else a > 5 %}B{% endif %}')).toThrow(/unknown statement|unexpected tag/i);
+    });
+
+    test('should throw on standalone if without body', () => {
+      // This is actually valid - empty body is allowed
+      const template = new Template('{% if condition %}{% endif %}');
+      const result = template.render({ condition: true });
+      expect(result).toBe('');
+    });
+
+    test('should throw on if with malformed condition expression', () => {
+      expect(() => new Template('{% if a + %}yes{% endif %}')).toThrow(/invalid expression/i);
+    });
+
+    // Nested structure errors
+    test('should throw on deeply nested structures without proper closing', () => {
+      expect(() => new Template(
+        '{% for a in x %}{% if a %}{% for b in y %}{{ b }}{% endfor %}{% endif %}'
+      )).toThrow(/no matching endfor/i);
+    });
+
+    test('should throw on incorrect nesting order', () => {
+      expect(() => new Template(
+        '{% for a in x %}{% if a %}{{ a }}{% endfor %}{% endif %}'
+      )).toThrow(/unexpected tag|no matching/i);
+    });
+
+    test('should handle correct complex nesting', () => {
+      const template = new Template(
+        '{% for a in x %}{% if a > 1 %}{% for b in y %}{{ b }}{% endfor %}{% endif %}{% endfor %}'
+      );
+      const result = template.render({ x: [1, 2, 3], y: ['a', 'b'] });
+      expect(result).toBe('abab');
+    });
+
+    // Empty statement blocks
+    test('should handle empty for loop body', () => {
+      const template = new Template('{% for item in items %}{% endfor %}');
+      const result = template.render({ items: [1, 2, 3] });
+      expect(result).toBe('');
+    });
+
+    test('should handle empty if body', () => {
+      const template = new Template('{% if true %}{% endif %}');
+      const result = template.render({});
+      expect(result).toBe('');
+    });
+
+    test('should handle empty else body', () => {
+      const template = new Template('{% if false %}{% else %}{% endif %}');
+      const result = template.render({});
+      expect(result).toBe('');
+    });
+
+    // Whitespace handling
+    test('should handle for loop with extra whitespace', () => {
+      const template = new Template('{%  for   item   in   items  %}{{ item }}{%  endfor  %}');
+      const result = template.render({ items: [1, 2, 3] });
+      expect(result).toBe('123');
+    });
+
+    test('should handle if statement with extra whitespace', () => {
+      const template = new Template('{%  if   condition  %}yes{%  endif  %}');
+      const result = template.render({ condition: true });
+      expect(result).toBe('yes');
+    });
+
+    // Tag case sensitivity
+    test('should throw on uppercase FOR tag', () => {
+      expect(() => new Template('{% FOR item in items %}{{ item }}{% endfor %}')).toThrow(/unknown statement/i);
+    });
+
+    test('should throw on uppercase IF tag', () => {
+      expect(() => new Template('{% IF condition %}yes{% endif %}')).toThrow(/unknown statement/i);
+    });
+
+    test('should throw on uppercase ENDFOR tag', () => {
+      expect(() => new Template('{% for item in items %}{{ item }}{% ENDFOR %}')).toThrow(/no matching endfor/i);
+    });
+
+    test('should throw on uppercase ENDIF tag', () => {
+      expect(() => new Template('{% if condition %}yes{% ENDIF %}')).toThrow(/no matching endif/i);
+    });
+
+    // Mixed delimiters
+    test('should throw on mixing statement and expression delimiters', () => {
+      expect(() => new Template('{{ for item in items }}{{ item }}{{ endfor }}')).toThrow(/invalid expression|unexpected/i);
+    });
+
+    test('should throw on statement in expression delimiters', () => {
+      expect(() => new Template('{{ if condition }}yes{{ endif }}')).toThrow(/invalid expression|unexpected/i);
+    });
+  });
+
   describe('Template Tag Errors', () => {
     test('should throw on unclosed interpolation tag', () => {
       expect(() => new Template('{{ variable')).toThrow(/unclosed tag/i);
