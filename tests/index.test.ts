@@ -28,6 +28,12 @@ import { Template } from '../src/template';
 import { testMethods } from './helpers';
 
 describe('Integration Tests', () => {
+  test('plain text template', () => {
+    const template = new Template('This is a plain text template without any variables or control structures.');
+    const result = template.render({}, testMethods);
+    expect(result).toBe('This is a plain text template without any variables or control structures.');
+  });
+
   test('comprehensive template with all features', () => {
     const template = new Template(`
 Hello, {{ user.name }}!
