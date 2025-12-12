@@ -508,6 +508,7 @@ template.render({
   b: new Decimal('20.2'), 
   c: new Decimal('5.3')
 }, methods); // "35.6" (precise calculation maintained)
+```
 
 ### Escape Sequences
 
