@@ -12,7 +12,7 @@ A lightweight, fast, and feature-rich JavaScript template engine with a familiar
 - � **Array Indexing** - Access array elements with bracket notation using literal or variable indices (`items[0]`, `items[index]`)
 - �💬 **Comments** - Template comments with `{# ... #}` syntax
 - 📊 **Operators** - Rich operator support including arithmetic (`+`, `-`, `*`, `/`, `%`, `**`), comparison, logical (`&&`, `||`, `!`), and bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`, `>>>`)
-- 🔧 **Custom Methods** - Extend templates with custom functions; methods receive standard JavaScript types (no need to handle `BigInt` or `Decimal`)
+- 🔧 **Custom Methods** - Extend templates with custom functions; methods receive standard JavaScript types
 - 🌳 **Nested Structures** - Support for deeply nested objects and arrays
 - 📝 **Variable & Method Extraction** - Automatically detect variables and methods used in templates
 - 💾 **Serialization** - Serialize templates to JSON and reconstruct them for caching and storage
