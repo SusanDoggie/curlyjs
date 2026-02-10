@@ -1026,7 +1026,7 @@ try {
 
 ## License
 
-MIT License - Copyright (c) 2015 - 2025 Susan Cheng
+MIT License - Copyright (c) 2015 - 2026 Susan Cheng
 
 ## Contributing
 
